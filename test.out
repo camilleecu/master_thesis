@@ -1,0 +1,67 @@
+Python PCT Framework -- run on 'test.s'
+Date: 25/11/2024, time: 22:26
+************************************************
+[General]
+Verbose = 1
+RandomSeed = 1
+
+[Data]
+File = /Users/camillecu/Downloads/KUL/master_thesis/pct/data/regression/hard_test1.csv
+TestSet = /Users/camillecu/Downloads/KUL/master_thesis/pct/data/regression/hard_test1.csv
+Hierarchy = /Users/camillecu/Downloads/KUL/master_thesis/pct/data/classification_hmc/eisen_FUN.hierarchy.txt
+
+[Attributes]
+Target = [7, 8]
+
+[Output]
+WritePredictionsTrain = False
+WritePredictionsTest = False
+
+[Model]
+MinimalWeight = 5.0
+
+[Tree]
+FTest = 1.0
+PBCT = False
+
+[Hierarchical]
+Type = None
+WType = ExpAvgParentWeight
+WParam = 0.75
+ClassificationThreshold = [0, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22, 24, 26, 28, 30, 32, 34, 36, 38, 40, 42, 44, 46, 48, 50, 52, 54, 56, 58, 60, 62, 64, 66, 68, 70, 72, 74, 76, 78, 80, 82, 84, 86, 88, 90, 92, 94, 96, 98, 100]
+
+[Forest]
+NumberOfTrees = 4
+BagSize = -1
+NumberOfFeatures = -1
+NumberOfVerticalFeatures = -1
+FeatureRanking = False
+OOBEstimate = False
+
+
+Statistics
+----------
+F-test: significance level = 1.0
+Induction time: 1.336
+Model information: (4 trees)
+	Nodes = 23 (Leaves: 12)
+	Nodes = 17 (Leaves: 9)
+	Nodes = 21 (Leaves: 11)
+	Nodes = 23 (Leaves: 12)
+
+Training error
+--------------
+Number of examples: 100
+Out-of-bag error: 
+	target0: 12.455164724123847
+	target1: 12.848630136627122
+
+
+Testing error
+--------------
+Number of examples: 100
+Out-of-bag error: 
+	target0: 12.455164724123847
+	target1: 12.848630136627122
+
+
