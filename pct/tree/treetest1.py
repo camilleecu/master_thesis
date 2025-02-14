@@ -90,8 +90,17 @@ class Tree1:
             @postcondition: A new node will be constructed, increasing the size of this tree by 1.
             """
             
+            """  comment out by Camille
             # Ensure this block is indented properly
-            attribute_name, criterion_value, attribute_value = self.splitter1.find_split(x, y, instance_weights)
+            # attribute_name, criterion_value, attribute_value = self.splitter1.find_split(x, y, instance_weights)
+            """
+            # Instead of using attribute-based splits, we need to split users based on item ratings. -- Camille
+            optimum_item_id, criterion_value = self.splitter.find_best_split_item(x, y, instance_weights)  # find_best_split_item New function in splitter.py
+            # Define new split criteria for user-item interactions
+            attribute_name = f"Item_{optimum_item_id}"  # Name it for clarity
+            attribute_value = x[optimum_item_id]  # Retrieve ratings for this item
+ 
+
 
             # If we didn't find an acceptable split, make the current node a leaf
             if ~self.is_acceptable(criterion_value):
@@ -105,9 +114,14 @@ class Tree1:
                     print(attribute_name, attribute_value, criterion_value)
 
             # Retrieve some convenience variables
-            missing_ind = utils.is_missing(x[attribute_name])
-            subset_ind = utils.is_in_left_branch(x[attribute_name], attribute_value)
-            weight1, weight2 = self.get_new_weights(instance_weights, missing_ind, subset_ind)
+            # missing_ind = utils.is_missing(x[attribute_name])  # comment out by Camille
+            # subset_ind = utils.is_in_left_branch(x[attribute_name], attribute_value) # comment out by Camille
+            # weight1, weight2 = self.get_new_weights(instance_weights, missing_ind, subset_ind) # comment out by Camille
+            # Users split based on their ratings for the chosen item
+            like_users = x[optimum_item_id] > 50  # Users who like the item
+            dislike_users = x[optimum_item_id] <= 50  # Users who dislike the item
+            unknown_users = x[optimum_item_id].isna()  # Users who haven't rated the item
+
 
             # Init the current node
             self.size["node_count"] += 1
@@ -115,13 +129,17 @@ class Tree1:
             node.set_proportion(weight1, weight2)
             node.set_prototype(y, instance_weights)
 
+            '''comment out by Camille  (is unnecessary because we already defined "like," "dislike," and "unknown" explicitly.)
             # MODIFIED: Split data into three subsets for three-way split
-            splitting_value1 = (attribute_value.min() + attribute_value.max()) / 3  # Calculate the first splitting value
-            splitting_value2 = (attribute_value.max() + attribute_value.min()) * 2 / 3  # Calculate the second splitting value
+            # splitting_value1 = (attribute_value.min() + attribute_value.max()) / 3  # Calculate the first splitting value
+            # splitting_value2 = (attribute_value.max() + attribute_value.min()) * 2 / 3  # Calculate the second splitting value
+            
+            # comment out by Camille, replaced by new lines
+            # left_subset = x[attribute_value < splitting_value1]  # Left subset
+            # middle_subset = x[(splitting_value1 <= attribute_value) & (attribute_value <= splitting_value2)]  # Middle subset
+            # right_subset = x[attribute_value > splitting_value2]  # Right subset
 
-            left_subset = x[attribute_value < splitting_value1]  # Left subset
-            middle_subset = x[(splitting_value1 <= attribute_value) & (attribute_value <= splitting_value2)]  # Middle subset
-            right_subset = x[attribute_value > splitting_value2]  # Right subset
+
 
             # Retrieve the datasets and instance weights for the children
             x_left = x.loc[left_subset.index]
@@ -135,6 +153,21 @@ class Tree1:
             instance_weights_left = instance_weights.loc[x_left.index]
             instance_weights_middle = instance_weights.loc[x_middle.index]
             instance_weights_right = instance_weights.loc[x_right.index]
+            '''
+
+            # new code from Camille
+            x_left = x.loc[like_users.index]  # Users who like the item
+            x_middle = x.loc[unknown_users.index]  # Users who have not rated the item
+            x_right = x.loc[dislike_users.index]  # Users who dislike the item
+
+            y_left = y.loc[x_left.index]
+            y_middle = y.loc[x_middle.index]
+            y_right = y.loc[x_right.index]
+
+            instance_weights_left = instance_weights.loc[x_left.index]
+            instance_weights_middle = instance_weights.loc[x_middle.index]
+            instance_weights_right = instance_weights.loc[x_right.index]
+
 
             # Recursive call to build the subtrees for each subset
             node.children = [

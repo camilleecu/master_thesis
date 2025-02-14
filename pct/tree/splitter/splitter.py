@@ -55,6 +55,39 @@ class Splitter:
         highest_split = np.argmax([a[0] for a in criteria])
         # print([criteria[i] if ~np.isneginf(criteria[i][0]) else [] for i in range(len(criteria))])
         return possible_attributes[highest_split], criteria[highest_split][0], criteria[highest_split][1]
+    
+
+    ## This function is implemented by Camille
+    def find_best_split_item(self, x, y, instance_weights):
+    """Finds the most informative item to split users based on rating variance.
+
+    @param x: User-item interaction matrix (rows = users, columns = items).
+    @param y: Target variable (ratings).
+    @param instance_weights: Weights assigned to each user.
+    @return: (best_item_id, criterion_value) - Item with highest variance in ratings.
+    """
+
+    item_variances = {}  # Store variance for each item
+
+    # Iterate over each item (column in x)
+    for item_id in x.columns:
+        ratings = x[item_id].dropna()  # Get non-missing ratings
+
+        # Skip items with too few ratings (min_instances ensures we have enough users per item)
+        if len(ratings) < self.min_instances:
+            continue  
+
+        # Calculate variance of ratings for this item
+        item_variances[item_id] = np.var(ratings)
+
+    # If no valid items found, return no split (-np.inf means no split will be chosen)
+    if not item_variances:
+        return None, -np.inf  
+
+    # Select item with the highest rating variance (most informative)
+    best_item_id = max(item_variances, key=item_variances.get)  
+    return best_item_id, item_variances[best_item_id]
+
 
     def numerical_split(self, x, y, instance_weights, attribute_name, criteria, return_index):
         """Finds the best split for the given numerical attribute."""
