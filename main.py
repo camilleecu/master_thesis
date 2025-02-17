@@ -19,6 +19,8 @@ from pct.forest.bi_forest import RandomBiClusteringForest
 import pct.tree.utils as utils
 from pct.evaluate.evaluate import Evaluate
 import datetime
+from active_learning import active_learning_iteration
+
 
 def main():
     # ======================
@@ -80,16 +82,26 @@ def main():
         subtree = HMC_parser.get_subtree(labelvector=y_train.columns, Hseparator="/")
         subtree = pd.DataFrame(subtree, index=y_train.columns, columns=["Subtree"])
 
+
+
     # =================
     # Train the learner
     # =================
     Tree.VERBOSE = Verbose
     if Verbose > 0: print("Training the learner\n")
     start = time.time()
+    X_matrix = np.zeros_like(x_train)  # Placeholder for unrated items (Ensure it has actual data!)## Camille
+    
     if NumberOfTrees is None:
         if PBCT == False:
+            
             learner = Tree(min_instances=MinimalWeight, ftest=FTest)
+
+            x_train = active_learning_iteration(learner, x_train, y_train, X_matrix) ## Camille
+
             learner.fit(x_train, y_train, target_weights=target_weights)
+            # Apply Active Learning to refine training data
+            
         elif PBCT == True:
             learner = BiClusteringTree(min_instances=MinimalWeight, ftest=FTest)
             learner.fit(x_train, y_train, subtree,

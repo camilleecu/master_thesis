@@ -89,7 +89,18 @@ class Tree:
         @return: The current node.
         @postcondition: A new node will be constructed, increasing the size of this tree by 1.
         """
-        attribute_name, criterion_value, attribute_value = self.splitter.find_split(x, y, instance_weights)
+        attribute_name, criterion_value = self.splitter.find_best_split_item(x, y, instance_weights)
+
+        # If no valid split is found, return a leaf node  ##Camille
+        if attribute_name is None:
+            self.size["leaf_count"] += 1
+            node = Node(parent=parent_node)
+            node.make_leaf(y, instance_weights)
+            return node
+
+        # Extract attribute values for splitting
+        attribute_value = x[attribute_name]
+
     
         # If we didn't find an acceptable split, make the current node a leaf
         if ~self.is_acceptable(criterion_value):
@@ -114,20 +125,46 @@ class Tree:
         node.set_prototype(y, instance_weights)
 
         # Retrieve the datasets and instance weights for the children
-        x_left  = x.loc[ subset_ind | missing_ind]
-        x_right = x.loc[~subset_ind | missing_ind]
-        y_left  = y.loc[x_left.index]
-        y_right = y.loc[x_right.index]
-        instance_weights_left  = instance_weights.loc[x_left.index]
-        instance_weights_right = instance_weights.loc[x_right.index]
-        instance_weights_left.loc[missing_ind]  *= weight1
-        instance_weights_right.loc[missing_ind] *= weight2
+        # x_left  = x.loc[ subset_ind | missing_ind]
+        # x_right = x.loc[~subset_ind | missing_ind]
+        # y_left  = y.loc[x_left.index]
+        # y_right = y.loc[x_right.index]
+        # instance_weights_left  = instance_weights.loc[x_left.index]
+        # instance_weights_right = instance_weights.loc[x_right.index]
+        # instance_weights_left.loc[missing_ind]  *= weight1
+        # instance_weights_right.loc[missing_ind] *= weight2
+
+        # Define three groups based on ratings
+l       like_users = x[attribute_name] > 50
+        dislike_users = x[attribute_name] <= 50
+        unknown_users = x[attribute_name].isna()
+
+        # Create subsets for each split
+        x_like = x.loc[like_users.index]
+        x_dislike = x.loc[dislike_users.index]
+        x_unknown = x.loc[unknown_users.index]
+
+        y_like = y.loc[x_like.index]
+        y_dislike = y.loc[x_dislike.index]
+        y_unknown = y.loc[x_unknown.index]
+
+        instance_weights_like = instance_weights.loc[x_like.index]
+        instance_weights_dislike = instance_weights.loc[x_dislike.index]
+        instance_weights_unknown = instance_weights.loc[x_unknown.index]
+
 
         # Call this function recursively on the node's children
-        node.children = [None,None]
-        node.children[0] = self.build( x_left , y_left , instance_weights_left , node )
-        node.children[1] = self.build( x_right, y_right, instance_weights_right, node )
-        return node
+        # node.children = [None,None]
+        # node.children[0] = self.build( x_left , y_left , instance_weights_left , node )
+        # node.children[1] = self.build( x_right, y_right, instance_weights_right, node )
+        # return node
+        # Recursively build the tree with three branches
+        node.children = [ ##Camille
+            self.build(x_like, y_like, instance_weights_like, node),
+            self.build(x_dislike, y_dislike, instance_weights_dislike, node),
+            self.build(x_unknown, y_unknown, instance_weights_unknown, node)
+]
+
 
     @staticmethod
     def is_acceptable(criterion_value):
@@ -217,7 +254,7 @@ class Tree:
         """
         # When in a leaf, return the prototype
         if node.is_leaf:
-            prototype = node.prototype
+            prototype = np.mean(node.prototype) #Camille
             # Sometimes there are missing target values in the prototype.
             while np.isnan(prototype).any() and node.parent is not None:
                 node = node.parent
