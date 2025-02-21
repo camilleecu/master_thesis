@@ -79,91 +79,55 @@ class Tree:
             self.target_weights
         )
 
-    def build(self, x, y, instance_weights, parent_node): ### extra parameter y_parent??
+    def build(self, x, y, instance_weights, parent_node): 
         """Recursively build this predictive clustering tree.
         
-        @param x: Pandas dataframe holding the descriptive variables at this point of the process.
-        @param y: Pandas dataframe holding the target variables at this point of the process.
-        @param instance_weights: Pandas dataframe holding the instance weights at this point.
+        @param x: Pandas dataframe holding the descriptive variables (user-item interactions).
+        @param y: Pandas dataframe holding the target variables (ratings).
+        @param instance_weights: Weights assigned to each user-item interaction.
         @param parent_node: Parent of the current node.
         @return: The current node.
-        @postcondition: A new node will be constructed, increasing the size of this tree by 1.
         """
-        attribute_name, criterion_value = self.splitter.find_best_split_item(x, y, instance_weights)
 
-        # If no valid split is found, return a leaf node  ##Camille
-        if attribute_name is None:
+        # Select the best item (feature) for splitting
+        best_item, criterion_value = self.splitter.find_best_split_item(x, y, instance_weights)
+
+        # If no valid split is found, create a leaf node
+        if best_item is None:
             self.size["leaf_count"] += 1
             node = Node(parent=parent_node)
             node.make_leaf(y, instance_weights)
             return node
 
-        # Extract attribute values for splitting
-        attribute_value = x[attribute_name]
-
-    
-        # If we didn't find an acceptable split, make the current node a leaf
-        if ~self.is_acceptable(criterion_value):
-            self.size["leaf_count"] += 1
-            node = Node(parent=parent_node)
-            node.make_leaf(y, instance_weights)
-            return node
-
-        # Print the output similar to Clus:
-        if Tree.VERBOSE > 0:
-            print (attribute_name, attribute_value, criterion_value)
-
-        # Retrieve some convenience variables
-        missing_ind = utils.is_missing(x[attribute_name])
-        subset_ind  = utils.is_in_left_branch(x[attribute_name], attribute_value)
-        weight1, weight2 = self.get_new_weights(instance_weights, missing_ind, subset_ind)
-
-        # Init the current node
+        # Create a node for this item split
         self.size["node_count"] += 1
-        node = Node(attribute_name, attribute_value, criterion_value, parent_node)
-        node.set_proportion(weight1, weight2)
-        node.set_prototype(y, instance_weights)
+        node = Node(best_item, criterion_value, parent_node)
 
-        # Retrieve the datasets and instance weights for the children
-        # x_left  = x.loc[ subset_ind | missing_ind]
-        # x_right = x.loc[~subset_ind | missing_ind]
-        # y_left  = y.loc[x_left.index]
-        # y_right = y.loc[x_right.index]
-        # instance_weights_left  = instance_weights.loc[x_left.index]
-        # instance_weights_right = instance_weights.loc[x_right.index]
-        # instance_weights_left.loc[missing_ind]  *= weight1
-        # instance_weights_right.loc[missing_ind] *= weight2
+        # Get all users who rated this item (rI lookup)
+        users_rated_item = set(user for user, _ in rI[best_item])
 
-        # Define three groups based on ratings
-l       like_users = x[attribute_name] > 50
-        dislike_users = x[attribute_name] <= 50
-        unknown_users = x[attribute_name].isna()
+        # Classify users into three groups: Lovers, Haters, Unknowns
+        lovers = [u for u in users_rated_item if dict(rU[u]).get(best_item, 0) >= 4]   # Users who love it
+        haters = [u for u in users_rated_item if dict(rU[u]).get(best_item, 0) <= 3]   # Users who dislike it
+        unknowns = [u for u in x.index if u not in users_rated_item]  # Users with no rating
 
-        # Create subsets for each split
-        x_like = x.loc[like_users.index]
-        x_dislike = x.loc[dislike_users.index]
-        x_unknown = x.loc[unknown_users.index]
+        # Retrieve data subsets for each group
+        x_lovers, y_lovers = x.loc[lovers], y.loc[lovers]
+        x_haters, y_haters = x.loc[haters], y.loc[haters]
+        x_unknowns, y_unknowns = x.loc[unknowns], y.loc[unknowns]
 
-        y_like = y.loc[x_like.index]
-        y_dislike = y.loc[x_dislike.index]
-        y_unknown = y.loc[x_unknown.index]
+        instance_weights_lovers = instance_weights.loc[lovers]
+        instance_weights_haters = instance_weights.loc[haters]
+        instance_weights_unknowns = instance_weights.loc[unknowns]
 
-        instance_weights_like = instance_weights.loc[x_like.index]
-        instance_weights_dislike = instance_weights.loc[x_dislike.index]
-        instance_weights_unknown = instance_weights.loc[x_unknown.index]
+        # Recursively build the tree for each group
+        node.children = [
+            self.build(x_lovers, y_lovers, instance_weights_lovers, node),
+            self.build(x_haters, y_haters, instance_weights_haters, node),
+            self.build(x_unknowns, y_unknowns, instance_weights_unknowns, node)
+        ]
 
-
-        # Call this function recursively on the node's children
-        # node.children = [None,None]
-        # node.children[0] = self.build( x_left , y_left , instance_weights_left , node )
-        # node.children[1] = self.build( x_right, y_right, instance_weights_right, node )
-        # return node
-        # Recursively build the tree with three branches
-        node.children = [ ##Camille
-            self.build(x_like, y_like, instance_weights_like, node),
-            self.build(x_dislike, y_dislike, instance_weights_dislike, node),
-            self.build(x_unknown, y_unknown, instance_weights_unknown, node)
-]
+        return node
 
 
     @staticmethod
