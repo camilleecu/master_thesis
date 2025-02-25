@@ -23,29 +23,21 @@ class NumericHeuristic5(Heuristic5):
         e_U = sum2_U - (np.sum(sum_U) ** 2) / n_U if n_U > 0 else 0
         return e_L + e_H + e_U
 
-    def compute_statistics_for_groups(self, sum_t, sum2_t, n_t):
+    def compute_statistics_for_groups(self, rating_matrix_thresholded):
         """Compute statistics for the three groups: Lovers, Haters, and Unknowns."""
-        sum_L, sum2_L, n_L = np.zeros_like(sum_t), np.zeros_like(sum2_t), np.zeros_like(n_t)
-        sum_H, sum2_H, n_H = np.zeros_like(sum_t), np.zeros_like(sum2_t), np.zeros_like(n_t)
-        sum_U, sum2_U, n_U = np.zeros_like(sum_t), np.zeros_like(sum2_t), np.zeros_like(n_t)
-        
-        # Loop through all users to classify them into Lovers, Haters, or Unknowns
-        for i in range(self.x.shape[0]):  # Iterate over each user
-            for j in range(self.x.shape[1]):  # Iterate over each item
-                rating = self.x[i, j]
-                # Classify the user based on their rating
-                if rating >= 4:  # Lovers
-                    sum_L[j] += rating
-                    sum2_L[j] += rating**2
-                    n_L[j] += 1
-                elif rating <= 3:  # Haters
-                    sum_H[j] += rating
-                    sum2_H[j] += rating**2
-                    n_H[j] += 1
-                else: # Unknowns
-                    sum_U[j] += rating
-                    sum2_U[j] += rating**2
-                    n_U[j] += 1
+        # Calculate the sums for each group
+        sum_L = np.sum(rating_matrix_thresholded == 1, axis=0)  # Lovers (ratings > THRESHOLD)
+        sum_H = np.sum(rating_matrix_thresholded == -1, axis=0)  # Haters (ratings <= THRESHOLD)
+        sum_U = np.sum(rating_matrix_thresholded == 0, axis=0)  # Unknowns (ratings == 0)
+
+        sum2_L = np.sum(rating_matrix_thresholded[rating_matrix_thresholded == 1]**2, axis=0)
+        sum2_H = np.sum(rating_matrix_thresholded[rating_matrix_thresholded == -1]**2, axis=0)
+        sum2_U = np.sum(rating_matrix_thresholded[rating_matrix_thresholded == 0]**2, axis=0)
+
+        # Get the number of ratings in each group
+        n_L = np.count_nonzero(rating_matrix_thresholded == 1, axis=0)
+        n_H = np.count_nonzero(rating_matrix_thresholded == -1, axis=0)
+        n_U = np.count_nonzero(rating_matrix_thresholded == 0, axis=0)
 
         return sum_L, sum2_L, n_L, sum_H, sum2_H, n_H, sum_U, sum2_U, n_U
 
