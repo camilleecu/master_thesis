@@ -51,7 +51,7 @@ class NumericHeuristic5(Heuristic5):
 
       def squared_error_total(self):
           """Returns the total squared error based on Lovers, Haters, and Unknowns groups."""
-          sum_L, sum2_L, n_L, sum_H, sum2_H, n_H, sum_U, sum2_U, n_U = self.compute_statistics()
+          sum_L, sum2_L, n_L, sum_H, sum2_H, n_H, sum_U, sum2_U, n_U = self.compute_statistics_for_groups(sum_t, sum2_t, n_t)
 
           # Calculate squared error using the method from Heuristic5
           squared_error = self.squared_error(sum_L, sum_H, sum_U, sum2_L,sum2_H, sum2_U, n_L, n_H, n_U)
