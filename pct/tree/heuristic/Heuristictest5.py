@@ -31,17 +31,13 @@ class Heuristic5:
         self.n_tot = np.sum(self.instance_weights)  # Total weight
         self.current_criterion = None  # Placeholder for the splitting criterion
 
-    def compute_statistics(self, threshold):
-        """Compute global statistics for the entire dataset, using thresholding."""
-        # Apply thresholding to the ratings matrix (same as thresholded matrix in NumericHeuristic5)
-        rating_matrix_thresholded = np.where(self.x > threshold, 1, np.where(self.x > 0, -1, 0))
-
-        # Now calculate sum, sum2, and n for the thresholded matrix
-        sum_t = np.sum(rating_matrix_thresholded, axis=0)
-        sum2_t = np.sum(rating_matrix_thresholded**2, axis=0)
-        n_t = np.count_nonzero(rating_matrix_thresholded != 0, axis=0)  # Number of non-zero ratings
+    def compute_statistics(self):
+        """Compute global statistics for the entire dataset, based on original rating matrix."""
+        # Calculate the total statistics: sum, sum2, and n (number of non-zero ratings)
+        sum_t = np.sum(self.x, axis=0)
+        sum2_t = np.sum(self.x**2, axis=0)
+        n_t = np.count_nonzero(self.x != 0, axis=0)  # Number of non-zero ratings
         return sum_t, sum2_t, n_t
-
     
     def stop_criteria(self, partition_sizes):
         return any(size < self.min_instances for size in partition_sizes)
