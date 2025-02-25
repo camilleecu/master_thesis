@@ -16,7 +16,7 @@ class NumericHeuristic5(Heuristic5):
         self.measure_heuristic = self.squared_error_total  # Focus on squared error for splitting
 
 
-    def squared_error(self, sum_L, sum_H, sum_U, n_L, n_H, n_U):
+    def squared_error(self, sum_L, sum_H, sum_U, sum2_L,sum2_H, sum2_U, n_L, n_H, n_U):
         """Compute the squared error for each group: Lovers, Haters, and Unknowns."""
         e_L = sum2_L - (np.sum(sum_L) ** 2) / n_L if n_L > 0 else 0
         e_H = sum2_H - (np.sum(sum_H) ** 2) / n_H if n_H > 0 else 0
@@ -54,7 +54,7 @@ class NumericHeuristic5(Heuristic5):
           sum_L, sum2_L, n_L, sum_H, sum2_H, n_H, sum_U, sum2_U, n_U = self.compute_statistics()
 
           # Calculate squared error using the method from Heuristic5
-          squared_error = self.squared_error(sum_L, sum_H, sum_U, n_L, n_H, n_U)
+          squared_error = self.squared_error(sum_L, sum_H, sum_U, sum2_L,sum2_H, sum2_U, n_L, n_H, n_U)
           return squared_error
 
      
