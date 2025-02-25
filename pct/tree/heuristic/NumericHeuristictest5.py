@@ -57,4 +57,8 @@ class NumericHeuristic5(Heuristic5):
           squared_error = self.squared_error(sum_L, sum_H, sum_U, sum2_L,sum2_H, sum2_U, n_L, n_H, n_U)
           return squared_error
 
+      def stop_criteria(self, n_L, n_H, n_U):
+          partition_sizes = [n_L, n_H, n_U]
+          return super().stop_criteria(partition_sizes)
+
      
