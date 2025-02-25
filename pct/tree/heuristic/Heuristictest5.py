@@ -38,9 +38,8 @@ class Heuristic5:
         n_t = np.count_nonzero(~np.isnan(self.x), axis=0)  # Number of users who rated each item
         return sum_t, sum2_t, n_t
 
-     def stop_criteria(self):
-        """True if and only if the current partition violates the min_instances restriction."""
-        partition_size = self.n_tot
-        return partition_size < self.min_instances or (self.n_tot - partition_size) < self.min_instances
+    
+    def stop_criteria(self, partition_sizes):
+        return any(size < self.min_instances for size in partition_sizes)
 
    
