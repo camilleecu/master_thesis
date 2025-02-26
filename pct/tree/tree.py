@@ -66,15 +66,16 @@ class Tree:
         self.root = self.build(self.x, self.y, instance_weights, None)
         # self.postProcess(self.root) #### this is needed only for classification tasks
         return self
-
+    
     def make_splitter(self):
-        """
-        Constructs a splitter object for this tree. This function was abstracted because
-        it is often the changing point for a new PCT method (RF, SSL, HMC, PBCT ...).
-        """
+            """
+            Constructs a splitter object for this tree. This function was abstracted because
+            it is often the changing point for a new PCT method (RF, SSL, HMC, PBCT ...).
+            """
         return Splitter(
             self.min_instances, 
-            self.numerical_attributes, self.categorical_attributes,
+            self.numerical_attributes, 
+            self.categorical_attributes,
             self.ftest, 
             self.target_weights
         )

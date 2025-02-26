@@ -1,9 +1,10 @@
 import numpy as np
 # from splitterThread import parallelSplitter
 # from threading import Thread
-from pct.tree.ftest.ftest import FTest
-from pct.tree.heuristic.NumericHeuristic import NumericHeuristic
-from pct.tree.heuristic.CategoricalHeuristic import CategoricalHeuristic
+# from pct.tree.ftest.ftest import FTest
+# from pct.tree.heuristic.NumericHeuristic import NumericHeuristic
+# from pct.tree.heuristic.CategoricalHeuristic import CategoricalHeuristic
+from pct.tree.heuristic.NumericHeuristic5 import NumericHeuristic5
 
 class Splitter:
     def __init__(
@@ -48,7 +49,7 @@ class Splitter:
 
     ## This function is implemented by Camille
     def find_best_split_item(self, x, y, instance_weights):
-        """Finds the most informative item to split users based on rating variance.
+        """Finds the most informative item to split users based on squared error reduction.
 
         @param x: User-item interaction matrix (rows = users, columns = items).
         @param y: Target variable (ratings).
@@ -56,26 +57,32 @@ class Splitter:
         @return: (best_item_id, criterion_value) - Item with highest variance in ratings.
         """
 
-        item_variances = {}  # Store variance for each item
+        best_item = None
+        lowest_error = np.inf  # We want to minimize squared error
 
-        # Iterate over each item (column in x)
+        # Iterate over each item (column) in the user-item matrix
         for item_id in x.columns:
-            ratings = x[item_id].dropna()  # Get non-missing ratings
+            item_ratings = x[item_id].values.reshape(-1, 1)  # Convert column to 2D array
 
-            # Skip items with too few ratings (min_instances ensures we have enough users per item)
-            if len(ratings) < self.min_instances:
+            # Skip items with too few ratings (ensure enough users per item)
+            if np.count_nonzero(~np.isnan(item_ratings)) < self.min_instances:
                 continue  
+            
+            # Compute squared error for this item using NumericHeuristic5
+            heuristic = NumericHeuristic5(
+                self.criterion, self.target_weights, self.min_instances, self.ftest,
+                instance_weights, item_ratings, y
+            )
+            
+            total_error = heuristic.squared_error_total()  # Compute total squared error
+            
+            # Select the item with the lowest squared error
+            if total_error < lowest_error:
+                best_item = item_id
+                lowest_error = total_error
 
-            # Calculate variance of ratings for this item
-            item_variances[item_id] = np.var(ratings)
-
-        # If no valid items found, return no split (-np.inf means no split will be chosen)
-        if not item_variances:
-            return None, -np.inf  
-
-        # Select item with the highest rating variance (most informative)
-        best_item_id = max(item_variances, key=item_variances.get)  
-        return best_item_id, item_variances[best_item_id]
+        # If no valid item is found, return None (no split possible)
+        return best_item, lowest_error if best_item is not None else (-np.inf)
 
 
     def numerical_split(self, x, y, instance_weights, attribute_name, criteria, return_index):
