@@ -69,7 +69,7 @@ class Splitter:
                 continue  
             
             # Compute squared error for this item using NumericHeuristic5
-            heuristic = NumericHeuristic5(
+            heuristic = NumericHeuristictest5(
                 self.criterion, self.target_weights, self.min_instances, self.ftest,
                 instance_weights, item_ratings, y
             )
