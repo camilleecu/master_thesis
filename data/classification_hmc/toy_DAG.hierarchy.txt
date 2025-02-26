@@ -1,1 +1,0 @@
-root/A,A/AB,AB/ABC,root/B,B/AB,B/BC,root/C,C/BC,C/ABC

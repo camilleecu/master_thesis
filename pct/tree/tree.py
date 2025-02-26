@@ -68,10 +68,10 @@ class Tree:
         return self
     
     def make_splitter(self):
-            """
-            Constructs a splitter object for this tree. This function was abstracted because
-            it is often the changing point for a new PCT method (RF, SSL, HMC, PBCT ...).
-            """
+        """
+        Constructs a splitter object for this tree. This function was abstracted because
+        it is often the changing point for a new PCT method (RF, SSL, HMC, PBCT ...).
+        """
         return Splitter(
             self.min_instances, 
             self.numerical_attributes, 

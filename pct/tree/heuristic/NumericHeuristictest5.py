@@ -1,5 +1,5 @@
 import numpy as np
-from pct.tree.heuristic.Heuristictest5 import Heuristic5
+from pct.tree.heuristic import Heuristic5
 
 class NumericHeuristic5(Heuristic5):
     def __init__(self, name, weights, min_instances, ftest, instance_weights, x, y):

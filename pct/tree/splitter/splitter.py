@@ -4,7 +4,7 @@ import numpy as np
 # from pct.tree.ftest.ftest import FTest
 # from pct.tree.heuristic.NumericHeuristic import NumericHeuristic
 # from pct.tree.heuristic.CategoricalHeuristic import CategoricalHeuristic
-from pct.tree.heuristic.NumericHeuristic5 import NumericHeuristic5
+from pct.tree.heuristic import NumericHeuristictest5
 
 class Splitter:
     def __init__(
