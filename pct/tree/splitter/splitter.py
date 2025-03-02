@@ -1,10 +1,12 @@
 import numpy as np
 # from splitterThread import parallelSplitter
 # from threading import Thread
-# from pct.tree.ftest.ftest import FTest
+from pct.tree.ftest.ftest import FTest
 # from pct.tree.heuristic.NumericHeuristic import NumericHeuristic
 # from pct.tree.heuristic.CategoricalHeuristic import CategoricalHeuristic
-from pct.tree.heuristic import NumericHeuristictest5
+from pct.tree.heuristic.Heuristic import Heuristic5
+from pct.tree.heuristic.NumericHeuristic import NumericHeuristic5
+
 
 class Splitter:
     def __init__(
@@ -25,6 +27,7 @@ class Splitter:
         """
         self.criterion = "variance"
         self.worst_performance = -1
+        print("Initializing Splitter...")
         self.ftest = FTest(ftest)
 
         self.min_instances = min_instances
@@ -69,7 +72,7 @@ class Splitter:
                 continue  
             
             # Compute squared error for this item using NumericHeuristic5
-            heuristic = NumericHeuristictest5(
+            heuristic = NumericHeuristic5(
                 self.criterion, self.target_weights, self.min_instances, self.ftest,
                 instance_weights, item_ratings, y
             )

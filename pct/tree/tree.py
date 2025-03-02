@@ -7,6 +7,8 @@ from collections import OrderedDict
 from pct.tree.node.node import Node
 from pct.tree.splitter.splitter import Splitter
 import pct.tree.utils as utils
+from pct.tree.ftest.ftest import FTest
+
 
 class Tree:
     """Main class containing the general functionality of predictive clustering trees.
@@ -36,36 +38,51 @@ class Tree:
         self.categorical_attributes = None
         self.numerical_attributes = None
         self.pruning_strat = None
-
     def fit(self, x, y, target_weights=None):
-        """Fits this PCT to the given dataset.
+    print("✅ Inside Tree.fit()... (pre try)")
+    try:
+        print("✅ Inside Tree.fit()... (post try)")
 
-        @param x: Pandas dataframe holding the descriptive variables.
-        @param y: Pandas dataframe holding the target variables (classification XOR regression).
-        @param target_weights: Weights given to the target variables (mainly used for HMC)
-            (default is None: the weights are then automatically generated based on target variances)
-        @return: This Tree object, trained on the given dataset.
-        """
         x = pd.DataFrame(x)
         y = pd.DataFrame(y)
-        # assert x.shape[0] == y.shape[0], "Number of instances and labels are mismatched"
+        print("✅ Converted x and y to DataFrame")
+
         self.x = x
         self.y = y
+        print("✅ Assigned x and y")
+
         if utils.learning_task(y) == "classification":
+            print("✅ Applying classification preprocessing...")
             self.y = utils.create_prototypes(y)
+
+        print("✅ Creating target weights...")
         self.target_weights = target_weights
         if target_weights is None:
             self.target_weights = utils.get_target_weights(self.y)
 
-        instance_weights = pd.DataFrame(np.full(x.shape[0], Tree.INITIAL_WEIGHT), index=x.index)
-        self.numerical_attributes   = x.select_dtypes(include=np.number).columns
+        print("✅ Identifying numerical and categorical attributes...")
+        self.numerical_attributes = x.select_dtypes(include=np.number).columns
         self.categorical_attributes = x.select_dtypes(exclude=np.number).columns
+
+        print("✅ Creating Splitter...")
         self.splitter = self.make_splitter()
 
-        self.size = {"node_count": 0, "leaf_count": 0}
+        if self.splitter is None:
+            raise ValueError("🚨 Splitter was not properly initialized!")
+
+        print("✅ Calling build()...")
+        instance_weights = pd.DataFrame(np.full(x.shape[0], Tree.INITIAL_WEIGHT), index=x.index)
         self.root = self.build(self.x, self.y, instance_weights, None)
-        # self.postProcess(self.root) #### this is needed only for classification tasks
+        print("✅ Tree built successfully!")
+
         return self
+
+    except Exception as e:
+        print(f"🚨 Exception in fit(): {e}")
+        import traceback
+        traceback.print_exc()
+
+    
     
     def make_splitter(self):
         """
