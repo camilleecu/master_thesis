@@ -317,33 +317,37 @@ class Tree:
                 leaves.append(node)
         return leaves
 
-    def draw_tree(self, fileName):
-        """Renders this tree as a networkx graph, stored in a png for the given filename."""
-        G = nx.DiGraph()
-        self.__convert_to_graph(self.root, G)
 
-        for _, _, d in G.edges(data=True):
-            d['label'] = d.get('value','')
-        # print (G.nodes())
-        A = nx.drawing.nx_agraph.to_agraph(G)
-        A.layout(prog='dot')
-        A.draw(fileName + '.png')
+   
+    
+    def print_tree_structure(self, node=None, level=0):
+        """Prints the tree structure for debugging."""
+        if node is None:
+            node = self.root  # Start from the root if no node is passed
+        
+        # Indentation based on the level in the tree
+        indent = " " * (level * 4)
 
-    def __convert_to_graph(self, node, G):
-        """Recursive function setting the node and edge information from this tree into G."""
-        # print (node.attribute_name)
-        if node.is_leaf:
-            return
+        # Calculate the number of items (samples) at this node
+        if self.x is not None:
+            # We filter the samples that reach this node, assuming `x` is a DataFrame containing the samples
+            node_items = self.x.loc[node.items].shape[0]  # Number of items reaching this node
         else:
-            G.add_node(node.name)
-            if node.attribute_name in self.numerical_attributes:
-                G.add_edge(node.name, node.children[1].name, value = "<=" + str(node.attribute_value))
-                self.__convert_to_graph(node.children[1], G)
-                G.add_edge(node.name, node.children[0].name, value = ">" + str(node.attribute_value))
-                self.__convert_to_graph(node.children[0], G)
-
-            elif node.attribute_name in self.categorical_attributes:
-                G.add_edge(node.name, node.children[0].name, value = "in" + str(node.attribute_value))
-                self.__convert_to_graph(node.children[0], G)
-                G.add_edge(node.name, node.children[1].name, value = "not in" + str(node.attribute_value))
-                self.__convert_to_graph(node.children[1], G)
+            node_items = "Unknown"  # If `x` is not passed, we assume the number of items is unknown at this level
+        
+        # Print basic information about the node
+        print(f"{indent}Node: {node.name}")
+        print(f"{indent}Attribute: {node.attribute_name}")
+        print(f"{indent}Value: {node.attribute_value}")
+        print(f"{indent}Criterion: {node.criterion_value}")
+        print(f"{indent}Number of items: {node_items}")
+        
+        if node.is_leaf:
+            print(f"{indent}Leaf Node: Yes")
+            print(f"{indent}Prediction: {node.prototype}")  # If the leaf node has a prediction (prototype)
+        else:
+            print(f"{indent}Leaf Node: No")
+            print(f"{indent}Children:")
+            # Recursively print information for each child node
+            for child in node.children:
+                self.print_tree_structure(child, level + 1)  # Increase the level for deeper indentation
