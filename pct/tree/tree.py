@@ -21,13 +21,13 @@ class Tree:
     VERBOSE = False # Verbosity level
     INITIAL_WEIGHT = 1.0 # The initial weight used for a sample.
 
-    def __init__(self, *, min_instances=5, ftest=0.01):
+    def __init__(self, *, min_instances=5): #, ftest=0.01
         """Constructs a new predictive clustering tree (PCT).
 
         @param min_instances: The minimum number of (weighted) samples in a leaf node (stopping criterion).
         @param ftest: The p-value (in [0,1]) used in the F-test for the statistical significance of a split.
         """
-        self.ftest = ftest
+        # self.ftest = ftest
         self.min_instances = min_instances
         self.splitter = None
         self.x = None
@@ -38,11 +38,11 @@ class Tree:
         self.categorical_attributes = None
         self.numerical_attributes = None
         self.pruning_strat = None
-    def fit(self, x, y, target_weights=None):
-    print("✅ Inside Tree.fit()... (pre try)")
-    try:
-        print("✅ Inside Tree.fit()... (post try)")
 
+    def fit(self, x, y, target_weights=None, rI=None, rU=None):
+        """
+        Fit the predictive clustering tree on the given dataset and store rI and rU.
+        """
         x = pd.DataFrame(x)
         y = pd.DataFrame(y)
         print("✅ Converted x and y to DataFrame")
@@ -50,6 +50,10 @@ class Tree:
         self.x = x
         self.y = y
         print("✅ Assigned x and y")
+
+        # Store rI and rU as attributes
+        self.rI = rI
+        self.rU = rU
 
         if utils.learning_task(y) == "classification":
             print("✅ Applying classification preprocessing...")
@@ -77,41 +81,17 @@ class Tree:
 
         return self
 
-    except Exception as e:
-        print(f"🚨 Exception in fit(): {e}")
-        import traceback
-        traceback.print_exc()
-
-    
-    
-    def make_splitter(self):
-        """
-        Constructs a splitter object for this tree. This function was abstracted because
-        it is often the changing point for a new PCT method (RF, SSL, HMC, PBCT ...).
-        """
-        return Splitter(
-            self.min_instances, 
-            self.numerical_attributes, 
-            self.categorical_attributes,
-            self.ftest, 
-            self.target_weights
-        )
-
     def build(self, x, y, instance_weights, parent_node): 
-        """Recursively build this predictive clustering tree.
+        print("🌲 Building predictive clustering tree...")
+        """Recursively build this predictive clustering tree."""
         
-        @param x: Pandas dataframe holding the descriptive variables (user-item interactions).
-        @param y: Pandas dataframe holding the target variables (ratings).
-        @param instance_weights: Weights assigned to each user-item interaction.
-        @param parent_node: Parent of the current node.
-        @return: The current node.
-        """
-
         # Select the best item (feature) for splitting
+        print("🔍 Finding best split item...")
         best_item, criterion_value = self.splitter.find_best_split_item(x, y, instance_weights)
 
         # If no valid split is found, create a leaf node
-        if best_item is None:
+        print("🍃 Creating leaf node...")
+        if (best_item is None):
             self.size["leaf_count"] += 1
             node = Node(parent=parent_node)
             node.make_leaf(y, instance_weights)
@@ -121,17 +101,24 @@ class Tree:
         self.size["node_count"] += 1
         node = Node(best_item, criterion_value, parent_node)
 
-        # Get all users who rated this item (rI lookup)
-        users_rated_item = set(user for user, _ in rI[best_item])
+        # Get all users who rated this item (rI lookup) using the class attribute
+        print("🔍 Retrieving users who rated the best item...")
+        users_rated_item = set(user for user, _ in self.rI[best_item])
 
         # Classify users into three groups: Lovers, Haters, Unknowns
-        lovers = [u for u in users_rated_item if dict(rU[u]).get(best_item, 0) >= 4]   # Users who love it
-        haters = [u for u in users_rated_item if dict(rU[u]).get(best_item, 0) <= 3]   # Users who dislike it
-        unknowns = [u for u in x.index if u not in users_rated_item]  # Users with no rating
+        print("🔍 Classifying users into three groups...")
+        lovers = [u for u in users_rated_item if dict(self.rU[u]).get(best_item, 0) >= 4]   # Users who love it
+        haters = [u for u in users_rated_item if dict(self.rU[u]).get(best_item, 0) <= 3]   # Users who dislike it
+        # unknowns = [u for u in x.index if u not in users_rated_item]  # Users with no rating
+        # Ensure 'unknowns' contains only users that are in 'instance_weights' (those who haven't rated any item)
+        print("🔍 Ensuring 'unknowns' contains only users that are in 'instance_weights'...")
+        unknowns = [u for u in x.index if u not in users_rated_item and u in instance_weights.index]
 
         # Retrieve data subsets for each group
+        print("🔍 Retrieving data subsets for each group...")
         x_lovers, y_lovers = x.loc[lovers], y.loc[lovers]
         x_haters, y_haters = x.loc[haters], y.loc[haters]
+        print("🔍 Retrieving instance weights for each group...")
         x_unknowns, y_unknowns = x.loc[unknowns], y.loc[unknowns]
 
         instance_weights_lovers = instance_weights.loc[lovers]
@@ -139,14 +126,28 @@ class Tree:
         instance_weights_unknowns = instance_weights.loc[unknowns]
 
         # Recursively build the tree for each group
+        print("🔍 Recursively building the tree for each group...")
         node.children = [
             self.build(x_lovers, y_lovers, instance_weights_lovers, node),
             self.build(x_haters, y_haters, instance_weights_haters, node),
+            print("🔍 Building the tree for 'unknowns'...")
             self.build(x_unknowns, y_unknowns, instance_weights_unknowns, node)
         ]
 
         return node
 
+    def make_splitter(self):
+        """
+        Constructs a splitter object for this tree. This function was abstracted because
+        it is often the changing point for a new PCT method (RF, SSL, HMC, PBCT ...).
+        """
+        return Splitter(
+            self.min_instances, 
+            self.numerical_attributes, 
+            self.categorical_attributes,
+            # self.ftest, 
+            self.target_weights
+        )
 
     @staticmethod
     def is_acceptable(criterion_value):
@@ -254,7 +255,6 @@ class Tree:
             child = ~utils.is_in_left_branch(value, node.attribute_value)
             return self.predict_instance(instance, node.children[child])
 
-
     def decision_path(self, x):
         """Returns the decision path for each instance in the given dataset.
 
@@ -349,4 +349,3 @@ class Tree:
                 self.__convert_to_graph(node.children[0], G)
                 G.add_edge(node.name, node.children[1].name, value = "not in" + str(node.attribute_value))
                 self.__convert_to_graph(node.children[1], G)
-                

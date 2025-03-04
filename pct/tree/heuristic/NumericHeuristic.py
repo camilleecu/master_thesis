@@ -1,10 +1,12 @@
 import numpy as np
 from pct.tree.heuristic.Heuristic import Heuristic5
 
+
+
 class NumericHeuristic5(Heuristic5):
-    def __init__(self, name, weights, min_instances, ftest, instance_weights, x, y):
+    def __init__(self, name, weights, min_instances, instance_weights, x, y):
         # Initialize the heuristic with given parameters and compute statistics
-        super().__init__(name, weights, min_instances, ftest, instance_weights, x, y)
+        super().__init__(name, weights, min_instances, instance_weights, x, y)
         self.measure_heuristic = self.squared_error_total  # Use squared error for splitting
 
         # Compute statistics

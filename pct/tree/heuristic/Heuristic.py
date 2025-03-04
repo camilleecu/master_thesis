@@ -19,11 +19,11 @@ import numpy as np
 
 
 class Heuristic5:
-    def __init__(self, name, weights, min_instances, ftest, instance_weights, x, y):
+    def __init__(self, name, weights, min_instances, instance_weights, x, y): # ftest,
         self.name = name
         self.weights = weights
         self.min_instances = min_instances
-        self.ftest = ftest
+        # self.ftest = ftest
         self.instance_weights = instance_weights
         self.x = x  # User-item ratings matrix
         self.y = y  # Target variable (ratings or other)
