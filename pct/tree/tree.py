@@ -110,9 +110,8 @@ class Tree:
         lovers = [u for u in users_rated_item if dict(self.rU[u]).get(best_item, 0) >= 4]   # Users who love it
         haters = [u for u in users_rated_item if dict(self.rU[u]).get(best_item, 0) <= 3]   # Users who dislike it
         # unknowns = [u for u in x.index if u not in users_rated_item]  # Users with no rating
-        # Ensure 'unknowns' contains only users that are in 'instance_weights' (those who haven't rated any item)
-        print("🔍 Ensuring 'unknowns' contains only users that are in 'instance_weights'...")
-        unknowns = [u for u in x.index if u not in users_rated_item and u in instance_weights.index]
+        print("🔍 Ensuring 'unknowns' ...")
+        unknowns = [u for u in users_rated_item if dict(self.rU[u]).get(best_item, 0) == 0 ]
 
         # Retrieve data subsets for each group
         print("🔍 Retrieving data subsets for each group...")
@@ -130,7 +129,6 @@ class Tree:
         node.children = [
             self.build(x_lovers, y_lovers, instance_weights_lovers, node),
             self.build(x_haters, y_haters, instance_weights_haters, node),
-            print("🔍 Building the tree for 'unknowns'...")
             self.build(x_unknowns, y_unknowns, instance_weights_unknowns, node)
         ]
 
