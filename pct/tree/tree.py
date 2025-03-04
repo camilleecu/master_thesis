@@ -12,7 +12,7 @@ from pct.tree.ftest.ftest import FTest
 
 class Tree:
     """Main class containing the general functionality of predictive clustering trees.
-
+    get_prediction
     Main source for HMC:
         VENS, Celine, et al. Decision trees for hierarchical multi-label classification. 
         Machine learning, 2008, 73.2: 185.
@@ -86,11 +86,11 @@ class Tree:
         """Recursively build this predictive clustering tree."""
         
         # Select the best item (feature) for splitting
-        print("🔍 Finding best split item...")
         best_item, criterion_value = self.splitter.find_best_split_item(x, y, instance_weights)
+        print("🔍 Best item for splitting: ", best_item)
 
         # If no valid split is found, create a leaf node
-        print("🍃 Creating leaf node...")
+        print("🍃 Creating leaf node if no valid split is found...")
         if (best_item is None):
             self.size["leaf_count"] += 1
             node = Node(parent=parent_node)
@@ -102,19 +102,23 @@ class Tree:
         node = Node(best_item, criterion_value, parent_node)
 
         # Get all users who rated this item (rI lookup) using the class attribute
-        print("🔍 Retrieving users who rated the best item...")
         users_rated_item = set(user for user, _ in self.rI[best_item])
+        # print number of users who rated the item
+        print("Number of users who rated the item: ", len(users_rated_item))
 
         # Classify users into three groups: Lovers, Haters, Unknowns
         print("🔍 Classifying users into three groups...")
         lovers = [u for u in users_rated_item if dict(self.rU[u]).get(best_item, 0) >= 4]   # Users who love it
+        # print number of lovers
+        print("Number of lovers: ", len(lovers))
         haters = [u for u in users_rated_item if dict(self.rU[u]).get(best_item, 0) <= 3]   # Users who dislike it
-        # unknowns = [u for u in x.index if u not in users_rated_item]  # Users with no rating
-        print("🔍 Ensuring 'unknowns' ...")
-        unknowns = [u for u in users_rated_item if dict(self.rU[u]).get(best_item, 0) == 0 ]
+        # print number of haters
+        print("Number of haters: ", len(haters))
+    
+        unknowns = [u for u in x.index if u not in users_rated_item]  # Users with no rating
+        # print number of unknowns
+        print("Number of unknowns: ", len(unknowns))
 
-        # Retrieve data subsets for each group
-        print("🔍 Retrieving data subsets for each group...")
         x_lovers, y_lovers = x.loc[lovers], y.loc[lovers]
         x_haters, y_haters = x.loc[haters], y.loc[haters]
         print("🔍 Retrieving instance weights for each group...")
@@ -317,9 +321,6 @@ class Tree:
                 leaves.append(node)
         return leaves
 
-
-   
-    
     def print_tree_structure(self, node=None, level=0):
         """Prints the tree structure for debugging."""
         if node is None:
@@ -328,19 +329,11 @@ class Tree:
         # Indentation based on the level in the tree
         indent = " " * (level * 4)
 
-        # Calculate the number of items (samples) at this node
-        if self.x is not None:
-            # We filter the samples that reach this node, assuming `x` is a DataFrame containing the samples
-            node_items = self.x.loc[node.items].shape[0]  # Number of items reaching this node
-        else:
-            node_items = "Unknown"  # If `x` is not passed, we assume the number of items is unknown at this level
-        
         # Print basic information about the node
         print(f"{indent}Node: {node.name}")
         print(f"{indent}Attribute: {node.attribute_name}")
         print(f"{indent}Value: {node.attribute_value}")
         print(f"{indent}Criterion: {node.criterion_value}")
-        print(f"{indent}Number of items: {node_items}")
         
         if node.is_leaf:
             print(f"{indent}Leaf Node: Yes")

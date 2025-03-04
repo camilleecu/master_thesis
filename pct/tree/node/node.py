@@ -18,14 +18,16 @@ class Node:
         """
         Node.id  += 1
         self.prototype = None
-        self.children = [] # Max of length 2 because binary splits
+        # self.children = [] # Max of length 2 because binary splits
+        self.children = [None, None, None]  # Ternary splits: [like, unknown, dislike]
         self.parent = parent
 
         self.attribute_name = attribute_name
         self.attribute_value = attribute_value
         self.criterion_value = criterion_value
-        self.proportion_left = None
-        self.proportion_right = None
+        self.proportion_like = None
+        self.proportion_unknown = None
+        self.proportion_dislike = None
         
         if attribute_name is not None:
             self.name = str(attribute_name) + "_" + str(self.id)
@@ -71,7 +73,7 @@ class Node:
         """
         self.y = np.vstack((node1.y,node2.y))
         self.prototype, summed_weights = self.get_prototype(y, weights)
-        self.children = []
+        self.children = [None, None, None]  # Ternary splits: [like, unknown, dislike]
         # Node.leaf_count += 1
         self.name = "leaf_" + str(self.id) + "=" + str(self.prototype) + " (" + str(summed_weights) + ")"
 
@@ -80,14 +82,18 @@ class Node:
         """Returns true if and only if this node has no children."""
         return len(self.children) == 0
 
-    def set_proportion(self, proportion_left, proportion_right):
-        """Sets the proportion of instances going to each of this node's children.
-        
-        If w(x) represents the sum of the instance weights in x, then this proportion
-        is calculated as w(child) / (w(this node) - w(missing values in the splitting variable)).
-        """
-        self.proportion_left  = proportion_left
-        self.proportion_right = proportion_right
+    def set_proportion(self, proportion_like, proportion_unknown, proportion_dislike):
+        """Sets the proportion of instances going to each child node in a ternary split."""
+        total = proportion_like + proportion_unknown + proportion_dislike
+        if total > 0:
+            self.proportion_like = proportion_like / total
+            self.proportion_unknown = proportion_unknown / total
+            self.proportion_dislike = proportion_dislike / total
+        else:
+            self.proportion_like = 0
+            self.proportion_unknown = 0
+            self.proportion_dislike = 0
+
 
     def print(self):
         print(self.attribute_name)
