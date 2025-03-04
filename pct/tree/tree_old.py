@@ -82,16 +82,16 @@ class Tree:
         return self
 
     def build(self, x, y, instance_weights, parent_node): 
-        """Recursively build this predictive clustering tree."""
         print("🌲 Building predictive clustering tree...")
-
+        """Recursively build this predictive clustering tree."""
+        
         # Select the best item (feature) for splitting
         best_item, criterion_value = self.splitter.find_best_split_item(x, y, instance_weights)
         print("🔍 Best item for splitting: ", best_item)
 
         # If no valid split is found, create a leaf node
-        if best_item is None:
-            print("🍃 Creating leaf node (no valid split found)...")
+        print("🍃 Creating leaf node if no valid split is found...")
+        if (best_item is None):
             self.size["leaf_count"] += 1
             node = Node(parent=parent_node)
             node.make_leaf(y, instance_weights)
@@ -101,47 +101,34 @@ class Tree:
         self.size["node_count"] += 1
         node = Node(best_item, criterion_value, parent_node)
 
-        # Get all users who rated this item (rI lookup)
-        users_rated_item = set(user for user, _ in self.rI.get(best_item, []))
-        print("👥 Users who rated item {}: {}".format(best_item, len(users_rated_item)))
+        # Get all users who rated this item (rI lookup) using the class attribute
+        users_rated_item = set(user for user, _ in self.rI[best_item])
+        # print number of users who rated the item
+        print("Number of users who rated the item: ", len(users_rated_item))
 
         # Classify users into three groups: Lovers, Haters, Unknowns
-        lovers = [u for u in users_rated_item if dict(self.rU[u]).get(best_item, 0) >= 4]  # Rating 4 or 5
-        haters = [u for u in users_rated_item if dict(self.rU[u]).get(best_item, 0) <= 3]  # Rating 3 or below
-        unknowns = [u for u in x.index if u not in users_rated_item]  # Users who have not rated this item
+        print("🔍 Classifying users into three groups...")
+        lovers = [u for u in users_rated_item if dict(self.rU[u]).get(best_item, 0) >= 4]   # Users who love it
+        # print number of lovers
+        print("Number of lovers: ", len(lovers))
+        haters = [u for u in users_rated_item if dict(self.rU[u]).get(best_item, 0) <= 3]   # Users who dislike it
+        # print number of haters
+        print("Number of haters: ", len(haters))
+    
+        unknowns = [u for u in x.index if u not in users_rated_item]  # Users with no rating
+        # print number of unknowns
+        print("Number of unknowns: ", len(unknowns))
 
-        print("❤️ Lovers:", len(lovers))
-        print("💔 Haters:", len(haters))
-        print("❓ Unknowns:", len(unknowns))
+        x_lovers, y_lovers = x.loc[lovers], y.loc[lovers]
+        x_haters, y_haters = x.loc[haters], y.loc[haters]
+        x_unknowns, y_unknowns = x.loc[unknowns], y.loc[unknowns]
 
-        # Ensure the selected users exist in x.index (avoid KeyError)
-        lovers = list(set(lovers) & set(x.index))
-        haters = list(set(haters) & set(x.index))
-        unknowns = list(set(unknowns) & set(x.index))
-
-        # Extract subsets based on filtered indices
-        x_lovers, y_lovers = x.loc[lovers].copy(), y.loc[lovers].copy()
-        x_haters, y_haters = x.loc[haters].copy(), y.loc[haters].copy()
-        x_unknowns, y_unknowns = x.loc[unknowns].copy(), y.loc[unknowns].copy()
-
-        instance_weights_lovers = instance_weights.loc[lovers].copy()
-        instance_weights_haters = instance_weights.loc[haters].copy()
-        instance_weights_unknowns = instance_weights.loc[unknowns].copy()
-
-        # Reset indices to maintain consistency in recursion
-        x_lovers.reset_index(drop=True, inplace=True)
-        y_lovers.reset_index(drop=True, inplace=True)
-        x_haters.reset_index(drop=True, inplace=True)
-        y_haters.reset_index(drop=True, inplace=True)
-        x_unknowns.reset_index(drop=True, inplace=True)
-        y_unknowns.reset_index(drop=True, inplace=True)
-
-        instance_weights_lovers.reset_index(drop=True, inplace=True)
-        instance_weights_haters.reset_index(drop=True, inplace=True)
-        instance_weights_unknowns.reset_index(drop=True, inplace=True)
+        instance_weights_lovers = instance_weights.loc[lovers]
+        instance_weights_haters = instance_weights.loc[haters]
+        instance_weights_unknowns = instance_weights.loc[unknowns]
 
         # Recursively build the tree for each group
-        print("🔄 Recursively building tree for subsets...")
+        print("🔍 Recursively building the tree for each group...")
         node.children = [
             self.build(x_lovers, y_lovers, instance_weights_lovers, node),
             self.build(x_haters, y_haters, instance_weights_haters, node),
