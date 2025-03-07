@@ -7,26 +7,29 @@ from collections import OrderedDict
 from pct.tree.node.node import Node
 from pct.tree.splitter.splitter import Splitter
 import pct.tree.utils as utils
+from pct.tree.ftest.ftest import FTest
+
 
 class Tree:
     """Main class containing the general functionality of predictive clustering trees.
-
+    get_prediction
     Main source for HMC:
         VENS, Celine, et al. Decision trees for hierarchical multi-label classification. 
         Machine learning, 2008, 73.2: 185.
     """
 
-    VERBOSE = False # Verbosity level
-    INITIAL_WEIGHT = 1.0 # The initial weight used for a sample.
+    VERBOSE = False  # Verbosity level
+    INITIAL_WEIGHT = 1.0  # The initial weight used for a sample.
 
-    def __init__(self, *, min_instances=5, ftest=0.01):
+    def __init__(self, *, min_instances=5, max_depth=4):  # , ftest=0.01
         """Constructs a new predictive clustering tree (PCT).
 
         @param min_instances: The minimum number of (weighted) samples in a leaf node (stopping criterion).
         @param ftest: The p-value (in [0,1]) used in the F-test for the statistical significance of a split.
         """
-        self.ftest = ftest
+        # self.ftest = ftest
         self.min_instances = min_instances
+        self.max_depth = max_depth
         self.splitter = None
         self.x = None
         self.y = None
@@ -37,64 +40,66 @@ class Tree:
         self.numerical_attributes = None
         self.pruning_strat = None
 
-    def fit(self, x, y, target_weights=None):
-        """Fits this PCT to the given dataset.
-
-        @param x: Pandas dataframe holding the descriptive variables.
-        @param y: Pandas dataframe holding the target variables (classification XOR regression).
-        @param target_weights: Weights given to the target variables (mainly used for HMC)
-            (default is None: the weights are then automatically generated based on target variances)
-        @return: This Tree object, trained on the given dataset.
+    def fit(self, x, y, target_weights=None, rI=None, rU=None):
+        """
+        Fit the predictive clustering tree on the given dataset and store rI and rU.
         """
         x = pd.DataFrame(x)
         y = pd.DataFrame(y)
-        # assert x.shape[0] == y.shape[0], "Number of instances and labels are mismatched"
+        print("✅ Converted x and y to DataFrame")
+
         self.x = x
         self.y = y
+        print("✅ Assigned x and y")
+
+        # Store rI and rU as attributes
+        self.rI = rI
+        self.rU = rU
+
         if utils.learning_task(y) == "classification":
+            print("✅ Applying classification preprocessing...")
             self.y = utils.create_prototypes(y)
+
+        print("✅ Creating target weights...")
         self.target_weights = target_weights
         if target_weights is None:
             self.target_weights = utils.get_target_weights(self.y)
 
-        instance_weights = pd.DataFrame(np.full(x.shape[0], Tree.INITIAL_WEIGHT), index=x.index)
-        self.numerical_attributes   = x.select_dtypes(include=np.number).columns
+        print("✅ Identifying numerical and categorical attributes...")
+        self.numerical_attributes = x.select_dtypes(include=np.number).columns
         self.categorical_attributes = x.select_dtypes(exclude=np.number).columns
+
+        print("✅ Creating Splitter...")
         self.splitter = self.make_splitter()
 
-        self.size = {"node_count": 0, "leaf_count": 0}
-        self.root = self.build(self.x, self.y, instance_weights, None)
-        # self.postProcess(self.root) #### this is needed only for classification tasks
-        return self
-    
-    def make_splitter(self):
-            """
-            Constructs a splitter object for this tree. This function was abstracted because
-            it is often the changing point for a new PCT method (RF, SSL, HMC, PBCT ...).
-            """
-        return Splitter(
-            self.min_instances, 
-            self.numerical_attributes, 
-            self.categorical_attributes,
-            self.ftest, 
-            self.target_weights
-        )
+        if self.splitter is None:
+            raise ValueError("🚨 Splitter was not properly initialized!")
 
-    def build(self, x, y, instance_weights, parent_node): 
-        """Recursively build this predictive clustering tree.
-        
-        @param x: Pandas dataframe holding the descriptive variables (user-item interactions).
-        @param y: Pandas dataframe holding the target variables (ratings).
-        @param instance_weights: Weights assigned to each user-item interaction.
-        @param parent_node: Parent of the current node.
-        @return: The current node.
-        """
+        print("✅ Calling build()...")
+        instance_weights = pd.DataFrame(np.full(x.shape[0], Tree.INITIAL_WEIGHT), index=x.index)
+        self.root = self.build(self.x, self.y, instance_weights, None)
+        print("✅ Tree built successfully!")
+
+        return self
+
+    def build(self, x, y, instance_weights, parent_node, depth=0):
+        """Recursively build this predictive clustering tree."""
+        if depth > self.max_depth:
+            print(f"🍃 Reached max depth at node {parent_node}. Stopping recursion.")
+            self.size["leaf_count"] += 1
+            node = Node(parent=parent_node)
+            node.make_leaf(y, instance_weights)
+            return node
+
+        print("🌲 Building predictive clustering tree...")
 
         # Select the best item (feature) for splitting
         best_item, criterion_value = self.splitter.find_best_split_item(x, y, instance_weights)
+        print("🔍 Best item for splitting: ", best_item)
 
         # If no valid split is found, create a leaf node
         if best_item is None:
+            print("🍃 Creating leaf node (no valid split found)...")
             self.size["leaf_count"] += 1
             node = Node(parent=parent_node)
             node.make_leaf(y, instance_weights)
@@ -105,31 +110,66 @@ class Tree:
         node = Node(best_item, criterion_value, parent_node)
 
         # Get all users who rated this item (rI lookup)
-        users_rated_item = set(user for user, _ in rI[best_item])
+        users_rated_item = set(user for user, _ in self.rI.get(best_item, []))
+        print("👥 Users who rated item {}: {}".format(best_item, len(users_rated_item)))
 
         # Classify users into three groups: Lovers, Haters, Unknowns
-        lovers = [u for u in users_rated_item if dict(rU[u]).get(best_item, 0) >= 4]   # Users who love it
-        haters = [u for u in users_rated_item if dict(rU[u]).get(best_item, 0) <= 3]   # Users who dislike it
-        unknowns = [u for u in x.index if u not in users_rated_item]  # Users with no rating
+        lovers = [u for u in users_rated_item if dict(self.rU[u]).get(best_item, 0) >= 4]  # Rating 4 or 5
+        haters = [u for u in users_rated_item if dict(self.rU[u]).get(best_item, 0) <= 3]  # Rating 3 or below
+        unknowns = [u for u in x.index if u not in users_rated_item]  # Users who have not rated this item
 
-        # Retrieve data subsets for each group
-        x_lovers, y_lovers = x.loc[lovers], y.loc[lovers]
-        x_haters, y_haters = x.loc[haters], y.loc[haters]
-        x_unknowns, y_unknowns = x.loc[unknowns], y.loc[unknowns]
+        print("❤️ Lovers:", len(lovers))
+        print("💔 Haters:", len(haters))
+        print("❓ Unknowns:", len(unknowns))
 
-        instance_weights_lovers = instance_weights.loc[lovers]
-        instance_weights_haters = instance_weights.loc[haters]
-        instance_weights_unknowns = instance_weights.loc[unknowns]
+        # Ensure the selected users exist in x.index (avoid KeyError)
+        lovers = list(set(lovers) & set(x.index))
+        haters = list(set(haters) & set(x.index))
+        unknowns = list(set(unknowns) & set(x.index))
+
+        # Extract subsets based on filtered indices
+        x_lovers, y_lovers = x.loc[lovers].copy(), y.loc[lovers].copy()
+        x_haters, y_haters = x.loc[haters].copy(), y.loc[haters].copy()
+        x_unknowns, y_unknowns = x.loc[unknowns].copy(), y.loc[unknowns].copy()
+
+        instance_weights_lovers = instance_weights.loc[lovers].copy()
+        instance_weights_haters = instance_weights.loc[haters].copy()
+        instance_weights_unknowns = instance_weights.loc[unknowns].copy()
+
+        # Reset indices to maintain consistency in recursion
+        x_lovers.reset_index(drop=True, inplace=True)
+        y_lovers.reset_index(drop=True, inplace=True)
+        x_haters.reset_index(drop=True, inplace=True)
+        y_haters.reset_index(drop=True, inplace=True)
+        x_unknowns.reset_index(drop=True, inplace=True)
+        y_unknowns.reset_index(drop=True, inplace=True)
+
+        instance_weights_lovers.reset_index(drop=True, inplace=True)
+        instance_weights_haters.reset_index(drop=True, inplace=True)
+        instance_weights_unknowns.reset_index(drop=True, inplace=True)
 
         # Recursively build the tree for each group
+        print("🔄 Recursively building tree for subsets...")
         node.children = [
-            self.build(x_lovers, y_lovers, instance_weights_lovers, node),
-            self.build(x_haters, y_haters, instance_weights_haters, node),
-            self.build(x_unknowns, y_unknowns, instance_weights_unknowns, node)
+            self.build(x_lovers, y_lovers, instance_weights_lovers, node, depth + 1),
+            self.build(x_haters, y_haters, instance_weights_haters, node, depth + 1),
+            self.build(x_unknowns, y_unknowns, instance_weights_unknowns, node, depth + 1)
         ]
 
         return node
 
+    def make_splitter(self):
+        """
+        Constructs a splitter object for this tree. This function was abstracted because
+        it is often the changing point for a new PCT method (RF, SSL, HMC, PBCT ...).
+        """
+        return Splitter(
+            self.min_instances,
+            self.numerical_attributes,
+            self.categorical_attributes,
+            # self.ftest, 
+            self.target_weights
+        )
 
     @staticmethod
     def is_acceptable(criterion_value):
@@ -146,16 +186,16 @@ class Tree:
         @param subset_index: Indices of the values going to the left branch of the node.
         @return: Tuple (weight for left child, weight for right child), summing to 1.
         """
-        total_weight   = np.sum(instance_weights)
+        total_weight = np.sum(instance_weights)
         missing_weight = np.sum(instance_weights.loc[missing_index])
-        subset_weight  = np.sum(instance_weights.loc[subset_index])
-        weight1 = (subset_weight/(total_weight - missing_weight)).values[0]
+        subset_weight = np.sum(instance_weights.loc[subset_index])
+        weight1 = (subset_weight / (total_weight - missing_weight)).values[0]
         weight2 = 1 - weight1
         return (weight1, weight2)
 
     def update_instance_weights(self, node_instance_weights, missing_index, partition_size, total_size):
         # TODO unused?
-        proportion = (partition_size - len(missing_index))/(total_size - len(missing_index))
+        proportion = (partition_size - len(missing_index)) / (total_size - len(missing_index))
         # subset (total - missing)
         node_instance_weights.loc[missing_index] = node_instance_weights.loc[missing_index] * proportion
         # print (proportion)
@@ -171,11 +211,11 @@ class Tree:
         # Recursively applies L{postProcessSamePrediction} on each (in)direct child node of 
         # the given node. The children are handled in postfix order, i.e. all children are 
         # handled before the parent. This is important to correctly prune leaves iteratively.
-        for n in node.children:    
+        for n in node.children:
             self.postProcess(n)
         self.postProcessSamePrediction(node)
-         
-    def postProcessSamePrediction(self, node, pruning_strat = None):
+
+    def postProcessSamePrediction(self, node, pruning_strat=None):
         """
         If the children of the given node are leaves which give the same output for
         L{get_prediction}, prunes them away with Node's L{make_leaf_prune}.
@@ -184,18 +224,17 @@ class Tree:
         @param pruning_strat: TODO unused.
         """
         if (~node.is_leaf
-            and node.children[0].is_leaf
-            and self.get_prediction(node.children[0]) == self.get_prediction(node.children[1])
+                and node.children[0].is_leaf
+                and self.get_prediction(node.children[0]) == self.get_prediction(node.children[1])
         ):
-            node.make_leaf_prune(node.children[0],node.children[1])            
-            
-    def get_prediction(self,leaf):
+            node.make_leaf_prune(node.children[0], node.children[1])
+
+    def get_prediction(self, leaf):
         """Returns the prediction prototype for the given leaf."""
         if leaf.prototype is not None:
-            return np.argmax(leaf.prototype) ## gimmick to get the same output as clus
+            return np.argmax(leaf.prototype)  ## gimmick to get the same output as clus
         return -1
 
-        
     def predict(self, x, single_label=False):
         """Predicts the labels for each instance in the given dataset.
 
@@ -206,8 +245,8 @@ class Tree:
         """
         x = pd.DataFrame(x)
         predictions = np.array([
-            self.predict_instance(instance, self.root) 
-            for _,instance in x.iterrows()
+            self.predict_instance(instance, self.root)
+            for _, instance in x.iterrows()
         ])
         return np.argmax(predictions, axis=1) if single_label else predictions
 
@@ -219,7 +258,7 @@ class Tree:
         """
         # When in a leaf, return the prototype
         if node.is_leaf:
-            prototype = np.mean(node.prototype) #Camille
+            prototype = np.mean(node.prototype)  # Camille
             # Sometimes there are missing target values in the prototype.
             while np.isnan(prototype).any() and node.parent is not None:
                 node = node.parent
@@ -229,14 +268,13 @@ class Tree:
         # Call this function recursively
         value = np.array(instance[node.attribute_name])
         if utils.is_missing(value):
-            left_prediction  = node.proportion_left  * self.predict_instance(instance, node.children[0])
+            left_prediction = node.proportion_left * self.predict_instance(instance, node.children[0])
             right_prediction = node.proportion_right * self.predict_instance(instance, node.children[1])
             return left_prediction + right_prediction
         else:
             # 0 (false) if left, 1 (true) if right
             child = ~utils.is_in_left_branch(value, node.attribute_value)
             return self.predict_instance(instance, node.children[child])
-
 
     def decision_path(self, x):
         """Returns the decision path for each instance in the given dataset.
@@ -259,15 +297,15 @@ class Tree:
         @param x: The (single) instance to make a decision path of.
         @param node: The current node in the recursive process.
         """
-        decision_path = OrderedDict() # (key, value) = (visited node, decision path value)
+        decision_path = OrderedDict()  # (key, value) = (visited node, decision path value)
         decision_path[self.root] = 1  # Root is always fully visited
-        queue = [self.root]           # Stopping criterion
+        queue = [self.root]  # Stopping criterion
 
         while len(queue) != 0:
             # Loop management
             node = queue.pop(0)
             if len(node.children) == 0:
-                continue # Nothing left to set here
+                continue  # Nothing left to set here
             queue.extend(node.children)
 
             # Set the decision path values
@@ -277,12 +315,12 @@ class Tree:
                 decision_path[node.children[1]] = decision_path[node] * node.proportion_right
             else:
                 goLeft = utils.is_in_left_branch(value, node.attribute_value)
-                goLeft = bool(goLeft) # Fix for weird python.bool vs numpy.bool stuff
-                decision_path[node.children[0]] = decision_path[node] if  goLeft else 0
+                goLeft = bool(goLeft)  # Fix for weird python.bool vs numpy.bool stuff
+                decision_path[node.children[0]] = decision_path[node] if goLeft else 0
                 decision_path[node.children[1]] = decision_path[node] if ~goLeft else 0
-            
+
         return list(decision_path.values())
-    
+
     def nodes(self):
         nodes = []
         queue = [self.root]
@@ -291,10 +329,10 @@ class Tree:
             queue.extend(node.children)
             nodes.append(node)
         return nodes
-    
+
     def leaves(self):
         leaves = []
-        queue  = [self.root]
+        queue = [self.root]
         while len(queue) != 0:
             node = queue.pop(0)
             queue.extend(node.children)
@@ -302,34 +340,28 @@ class Tree:
                 leaves.append(node)
         return leaves
 
-    def draw_tree(self, fileName):
-        """Renders this tree as a networkx graph, stored in a png for the given filename."""
-        G = nx.DiGraph()
-        self.__convert_to_graph(self.root, G)
-
-        for _, _, d in G.edges(data=True):
-            d['label'] = d.get('value','')
-        # print (G.nodes())
-        A = nx.drawing.nx_agraph.to_agraph(G)
-        A.layout(prog='dot')
-        A.draw(fileName + '.png')
-
-    def __convert_to_graph(self, node, G):
-        """Recursive function setting the node and edge information from this tree into G."""
-        # print (node.attribute_name)
-        if node.is_leaf:
+    def print_tree_structure(self, node=None, level=0):
+        """Prints the tree structure for debugging."""
+        if level > self.max_depth:
             return
-        else:
-            G.add_node(node.name)
-            if node.attribute_name in self.numerical_attributes:
-                G.add_edge(node.name, node.children[1].name, value = "<=" + str(node.attribute_value))
-                self.__convert_to_graph(node.children[1], G)
-                G.add_edge(node.name, node.children[0].name, value = ">" + str(node.attribute_value))
-                self.__convert_to_graph(node.children[0], G)
+        if node is None:
+            node = self.root  # Start from the root if no node is passed
 
-            elif node.attribute_name in self.categorical_attributes:
-                G.add_edge(node.name, node.children[0].name, value = "in" + str(node.attribute_value))
-                self.__convert_to_graph(node.children[0], G)
-                G.add_edge(node.name, node.children[1].name, value = "not in" + str(node.attribute_value))
-                self.__convert_to_graph(node.children[1], G)
-                
+        # Indentation based on the level in the tree
+        indent = " " * (level * 4)
+
+        # Print basic information about the node
+        print(f"{indent}Node: {node.name}")
+        print(f"{indent}Attribute: {node.attribute_name}")
+        print(f"{indent}Value: {node.attribute_value}")
+        print(f"{indent}Criterion: {node.criterion_value}")
+
+        if node.is_leaf:
+            print(f"{indent}Leaf Node: Yes")
+            print(f"{indent}Prediction: {node.prototype}")  # If the leaf node has a prediction (prototype)
+        else:
+            print(f"{indent}Leaf Node: No")
+            print(f"{indent}Children:")
+            # Recursively print information for each child node
+            for child in node.children:
+                self.print_tree_structure(child, level + 1)  # Increase the level for deeper indentation
