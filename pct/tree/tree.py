@@ -18,10 +18,10 @@ class Tree:
         Machine learning, 2008, 73.2: 185.
     """
 
-    VERBOSE = False # Verbosity level
-    INITIAL_WEIGHT = 1.0 # The initial weight used for a sample.
+    VERBOSE = False  # Verbosity level
+    INITIAL_WEIGHT = 1.0  # The initial weight used for a sample.
 
-    def __init__(self, *, min_instances=5): #, ftest=0.01
+    def __init__(self, *, min_instances=5, max_depth=4):  # , ftest=0.01
         """Constructs a new predictive clustering tree (PCT).
 
         @param min_instances: The minimum number of (weighted) samples in a leaf node (stopping criterion).
@@ -29,6 +29,7 @@ class Tree:
         """
         # self.ftest = ftest
         self.min_instances = min_instances
+        self.max_depth = max_depth
         self.splitter = None
         self.x = None
         self.y = None
@@ -81,8 +82,15 @@ class Tree:
 
         return self
 
-    def build(self, x, y, instance_weights, parent_node): 
+    def build(self, x, y, instance_weights, parent_node, depth=0):
         """Recursively build this predictive clustering tree."""
+        if depth > self.max_depth:
+            print(f"🍃 Reached max depth at node {parent_node}. Stopping recursion.")
+            self.size["leaf_count"] += 1
+            node = Node(parent=parent_node)
+            node.make_leaf(y, instance_weights)
+            return node
+
         print("🌲 Building predictive clustering tree...")
 
         # Select the best item (feature) for splitting
@@ -143,9 +151,9 @@ class Tree:
         # Recursively build the tree for each group
         print("🔄 Recursively building tree for subsets...")
         node.children = [
-            self.build(x_lovers, y_lovers, instance_weights_lovers, node),
-            self.build(x_haters, y_haters, instance_weights_haters, node),
-            self.build(x_unknowns, y_unknowns, instance_weights_unknowns, node)
+            self.build(x_lovers, y_lovers, instance_weights_lovers, node, depth + 1),
+            self.build(x_haters, y_haters, instance_weights_haters, node, depth + 1),
+            self.build(x_unknowns, y_unknowns, instance_weights_unknowns, node, depth + 1)
         ]
 
         return node
@@ -156,8 +164,8 @@ class Tree:
         it is often the changing point for a new PCT method (RF, SSL, HMC, PBCT ...).
         """
         return Splitter(
-            self.min_instances, 
-            self.numerical_attributes, 
+            self.min_instances,
+            self.numerical_attributes,
             self.categorical_attributes,
             # self.ftest, 
             self.target_weights
@@ -178,16 +186,16 @@ class Tree:
         @param subset_index: Indices of the values going to the left branch of the node.
         @return: Tuple (weight for left child, weight for right child), summing to 1.
         """
-        total_weight   = np.sum(instance_weights)
+        total_weight = np.sum(instance_weights)
         missing_weight = np.sum(instance_weights.loc[missing_index])
-        subset_weight  = np.sum(instance_weights.loc[subset_index])
-        weight1 = (subset_weight/(total_weight - missing_weight)).values[0]
+        subset_weight = np.sum(instance_weights.loc[subset_index])
+        weight1 = (subset_weight / (total_weight - missing_weight)).values[0]
         weight2 = 1 - weight1
         return (weight1, weight2)
 
     def update_instance_weights(self, node_instance_weights, missing_index, partition_size, total_size):
         # TODO unused?
-        proportion = (partition_size - len(missing_index))/(total_size - len(missing_index))
+        proportion = (partition_size - len(missing_index)) / (total_size - len(missing_index))
         # subset (total - missing)
         node_instance_weights.loc[missing_index] = node_instance_weights.loc[missing_index] * proportion
         # print (proportion)
@@ -203,11 +211,11 @@ class Tree:
         # Recursively applies L{postProcessSamePrediction} on each (in)direct child node of 
         # the given node. The children are handled in postfix order, i.e. all children are 
         # handled before the parent. This is important to correctly prune leaves iteratively.
-        for n in node.children:    
+        for n in node.children:
             self.postProcess(n)
         self.postProcessSamePrediction(node)
-         
-    def postProcessSamePrediction(self, node, pruning_strat = None):
+
+    def postProcessSamePrediction(self, node, pruning_strat=None):
         """
         If the children of the given node are leaves which give the same output for
         L{get_prediction}, prunes them away with Node's L{make_leaf_prune}.
@@ -216,18 +224,17 @@ class Tree:
         @param pruning_strat: TODO unused.
         """
         if (~node.is_leaf
-            and node.children[0].is_leaf
-            and self.get_prediction(node.children[0]) == self.get_prediction(node.children[1])
+                and node.children[0].is_leaf
+                and self.get_prediction(node.children[0]) == self.get_prediction(node.children[1])
         ):
-            node.make_leaf_prune(node.children[0],node.children[1])            
-            
-    def get_prediction(self,leaf):
+            node.make_leaf_prune(node.children[0], node.children[1])
+
+    def get_prediction(self, leaf):
         """Returns the prediction prototype for the given leaf."""
         if leaf.prototype is not None:
-            return np.argmax(leaf.prototype) ## gimmick to get the same output as clus
+            return np.argmax(leaf.prototype)  ## gimmick to get the same output as clus
         return -1
 
-        
     def predict(self, x, single_label=False):
         """Predicts the labels for each instance in the given dataset.
 
@@ -238,8 +245,8 @@ class Tree:
         """
         x = pd.DataFrame(x)
         predictions = np.array([
-            self.predict_instance(instance, self.root) 
-            for _,instance in x.iterrows()
+            self.predict_instance(instance, self.root)
+            for _, instance in x.iterrows()
         ])
         return np.argmax(predictions, axis=1) if single_label else predictions
 
@@ -251,7 +258,7 @@ class Tree:
         """
         # When in a leaf, return the prototype
         if node.is_leaf:
-            prototype = np.mean(node.prototype) #Camille
+            prototype = np.mean(node.prototype)  # Camille
             # Sometimes there are missing target values in the prototype.
             while np.isnan(prototype).any() and node.parent is not None:
                 node = node.parent
@@ -261,7 +268,7 @@ class Tree:
         # Call this function recursively
         value = np.array(instance[node.attribute_name])
         if utils.is_missing(value):
-            left_prediction  = node.proportion_left  * self.predict_instance(instance, node.children[0])
+            left_prediction = node.proportion_left * self.predict_instance(instance, node.children[0])
             right_prediction = node.proportion_right * self.predict_instance(instance, node.children[1])
             return left_prediction + right_prediction
         else:
@@ -290,15 +297,15 @@ class Tree:
         @param x: The (single) instance to make a decision path of.
         @param node: The current node in the recursive process.
         """
-        decision_path = OrderedDict() # (key, value) = (visited node, decision path value)
+        decision_path = OrderedDict()  # (key, value) = (visited node, decision path value)
         decision_path[self.root] = 1  # Root is always fully visited
-        queue = [self.root]           # Stopping criterion
+        queue = [self.root]  # Stopping criterion
 
         while len(queue) != 0:
             # Loop management
             node = queue.pop(0)
             if len(node.children) == 0:
-                continue # Nothing left to set here
+                continue  # Nothing left to set here
             queue.extend(node.children)
 
             # Set the decision path values
@@ -308,12 +315,12 @@ class Tree:
                 decision_path[node.children[1]] = decision_path[node] * node.proportion_right
             else:
                 goLeft = utils.is_in_left_branch(value, node.attribute_value)
-                goLeft = bool(goLeft) # Fix for weird python.bool vs numpy.bool stuff
-                decision_path[node.children[0]] = decision_path[node] if  goLeft else 0
+                goLeft = bool(goLeft)  # Fix for weird python.bool vs numpy.bool stuff
+                decision_path[node.children[0]] = decision_path[node] if goLeft else 0
                 decision_path[node.children[1]] = decision_path[node] if ~goLeft else 0
-            
+
         return list(decision_path.values())
-    
+
     def nodes(self):
         nodes = []
         queue = [self.root]
@@ -322,10 +329,10 @@ class Tree:
             queue.extend(node.children)
             nodes.append(node)
         return nodes
-    
+
     def leaves(self):
         leaves = []
-        queue  = [self.root]
+        queue = [self.root]
         while len(queue) != 0:
             node = queue.pop(0)
             queue.extend(node.children)
@@ -335,9 +342,11 @@ class Tree:
 
     def print_tree_structure(self, node=None, level=0):
         """Prints the tree structure for debugging."""
+        if level > self.max_depth:
+            return
         if node is None:
             node = self.root  # Start from the root if no node is passed
-        
+
         # Indentation based on the level in the tree
         indent = " " * (level * 4)
 
@@ -346,7 +355,7 @@ class Tree:
         print(f"{indent}Attribute: {node.attribute_name}")
         print(f"{indent}Value: {node.attribute_value}")
         print(f"{indent}Criterion: {node.criterion_value}")
-        
+
         if node.is_leaf:
             print(f"{indent}Leaf Node: Yes")
             print(f"{indent}Prediction: {node.prototype}")  # If the leaf node has a prediction (prototype)
