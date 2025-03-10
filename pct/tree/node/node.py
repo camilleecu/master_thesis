@@ -8,37 +8,38 @@ class Node:
     leaf_count = 0 # Number of leaves made
     id = 0         # Number of nodes made (used for giving unique ID's to the nodes)
 
-    def __init__(self, attribute_name=None, attribute_value=None, criterion_value=None, parent=None):
-        """Makes a new node in the tree with given properties.
-
-        @param attribute_name : The name of the attribute used to split in this node.
-        @param attribute_value: The value or set of values on which the split was made.
-        @param criterion_value: The value of the heuristic function reached for this split.
+    def __init__(self, attribute_name=None,  criterion_value=None, parent=None, depth=0): #attribute_value=None, (deleted)
+        """Creates a new node with attribute_name as the best item from tree.py 
+        and criterion_value from tree.py.
+        
+        @param attribute_name : The best feature (item) chosen for splitting.
+        @param criterion_value: The criterion value used to evaluate the split.
         @param parent: The parent node of this node.
+        @param depth: Depth of the node in the tree.
         """
+
         Node.id  += 1
-        self.prototype = None
+        # self.prototype = None
         # self.children = [] # Max of length 2 because binary splits
         self.children = [None, None, None]  # Ternary splits: [like, unknown, dislike]
         self.parent = parent
+        self.depth = depth
 
-        self.attribute_name = attribute_name
-        self.attribute_value = attribute_value
-        self.criterion_value = criterion_value
-        self.proportion_like = None
-        self.proportion_unknown = None
-        self.proportion_dislike = None
+        # Assign values from tree.py
+        self.attribute_name = attribute_name  # Best feature for splitting
+        self.criterion_value = criterion_value  # Split quality metric
+
+        self.lovers_count = 0    # Count of users who love the item
+        self.haters_count = 0    # Count of users who hate the item
+        self.unknowns_count = 0  # Count of users with unknown rating for the item
         
+
         if attribute_name is not None:
-            self.name = str(attribute_name) + "_" + str(self.id)
+            self.name = f"{attribute_name}_{Node.id}"
 
     def make_leaf(self, y, weights):
         """Turn this node into a leaf node, setting a prototype for later classification.
-
-        @param y      : The target vector at this node in the tree.
-        @type  y      : Pandas.DataFrame
-        @param weights: The instance weights for each of the target entries in y.
-        @type  weights: Pandas.DataFrame
+        If the tree depth limit is reached (depth > self.max_depth), a leaf node is created using Node.make_leaf().
         """
         self.y = y
         self.prototype, summed_weights = self.get_prototype(y, weights)
@@ -93,10 +94,18 @@ class Node:
             self.proportion_like = 0
             self.proportion_unknown = 0
             self.proportion_dislike = 0
+            
+    def set_split_info(self, split_item, user_rating, lovers, haters, unknowns):
+        """Store information about the split, user rating, and distribution."""
+        self.split_item = split_item
+        self.user_rating = user_rating
+        self.lovers_count = len(lovers)
+        self.haters_count = len(haters)
+        self.unknowns_count = len(unknowns)
 
 
     def print(self):
         print(self.attribute_name)
-        print(self.attribute_value)
+        # print(self.attribute_value)
         print(self.criterion_value)
         print('-------')

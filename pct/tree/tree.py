@@ -7,7 +7,8 @@ from collections import OrderedDict
 from pct.tree.node.node import Node
 from pct.tree.splitter.splitter import Splitter
 import pct.tree.utils as utils
-from pct.tree.ftest.ftest import FTest
+# from pct.tree.ftest.ftest import FTest
+import matplotlib.pyplot as plt
 
 
 class Tree:
@@ -353,7 +354,7 @@ class Tree:
         # Print basic information about the node
         print(f"{indent}Node: {node.name}")
         print(f"{indent}Attribute: {node.attribute_name}")
-        print(f"{indent}Value: {node.attribute_value}")
+        # print(f"{indent}Value: {node.attribute_value}")
         print(f"{indent}Criterion: {node.criterion_value}")
 
         if node.is_leaf:
@@ -365,3 +366,34 @@ class Tree:
             # Recursively print information for each child node
             for child in node.children:
                 self.print_tree_structure(child, level + 1)  # Increase the level for deeper indentation
+
+    def visualize_tree(self):
+        """Creates a graphical representation of the decision tree using networkx."""
+        graph = nx.DiGraph()
+        self._add_edges(self.root, graph)
+
+        plt.figure(figsize=(12, 8))
+        pos = nx.spring_layout(graph, seed=42)  # Positioning of nodes
+        labels = {node: data["label"] for node, data in graph.nodes(data=True)}
+
+        nx.draw(graph, pos, with_labels=True, labels=labels, node_size=3000, node_color="lightblue", edge_color="gray")
+        plt.title("Decision Tree Structure")
+        plt.show()
+
+    def _add_edges(self, node, graph, parent=None):
+        """Recursively adds edges to the graph for visualization."""
+        if node is None:
+            return
+        
+        # Assign a label for the node
+        node_label = f"{node.attribute_name}\nCriterion: {node.criterion_value}"
+        graph.add_node(node.name, label=node_label)
+
+        # Add an edge from the parent to the current node
+        if parent:
+            graph.add_edge(parent, node.name)
+
+        # Recursively add children
+        for child in node.children:
+            if child is not None:
+                self._add_edges(child, graph, node.name)
