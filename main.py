@@ -11,7 +11,7 @@ import pandas as pd
 from pct.parser.parser import Parser
 from pct.tree.utils import HMC_parser
 # Learners
-from pct.tree.tree import Tree
+from pct.tree.indiantree import Tree
 from pct.tree.bi_tree import BiClusteringTree
 from pct.forest.forest import RandomForest
 from pct.forest.bi_forest import RandomBiClusteringForest

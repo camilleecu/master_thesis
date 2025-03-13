@@ -13,7 +13,7 @@ import pandas as pd
 #  |  __/| |___  | |  
 #  |_|    \____| |_|  
 #
-from pct.tree.tree import Tree
+from pct.tree.indiantree import Tree
 
 # ==========
 # Regression
@@ -55,7 +55,7 @@ tree.decision_path(x_clas)
 #  |  _  | |  | | |___ 
 #  |_| |_|_|  |_|\____|
 #
-from pct.tree.tree import Tree
+from pct.tree.indiantree import Tree
 from pct.tree.utils import HMC_parser
 from pct.evaluate.evaluate import Evaluate
 

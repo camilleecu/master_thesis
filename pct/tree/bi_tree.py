@@ -4,7 +4,7 @@ from sklearn.preprocessing import OneHotEncoder
 from collections import OrderedDict
 
 import pct.tree.utils as utils
-from pct.tree.tree import Tree
+from pct.tree.indiantree import Tree
 from pct.tree.node.node import Node
 from pct.tree.splitter.splitter import Splitter
 

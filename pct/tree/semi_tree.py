@@ -1,6 +1,6 @@
 import numpy as np
 import pandas as pd
-from pct.tree.tree import Tree
+from pct.tree.indiantree import Tree
 from pct.tree.splitter.semi_splitter import SemiSupervisedSplitter
 
 class SemiSupervisedTree(Tree):

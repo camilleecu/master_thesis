@@ -2,7 +2,7 @@ import random
 import numpy as np
 import pandas as pd
 import pct.tree.utils as utils
-from pct.tree.tree import Tree
+from pct.tree.indiantree import Tree
 from pct.tree.node.node import Node
 from pct.tree.splitter.splitter import Splitter
 from pct.forest.forest_splitter import RandomForestSplitter

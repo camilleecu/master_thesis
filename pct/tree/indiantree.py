@@ -22,13 +22,7 @@ class Tree:
     VERBOSE = False  # Verbosity level
     INITIAL_WEIGHT = 1.0  # The initial weight used for a sample.
 
-    def __init__(self, *, min_instances=7, max_depth=6):  # , ftest=0.01
-        """Constructs a new predictive clustering tree (PCT).
-
-        @param min_instances: The minimum number of (weighted) samples in a leaf node (stopping criterion).
-        @param ftest: The p-value (in [0,1]) used in the F-test for the statistical significance of a split.
-        """
-        # self.ftest = ftest
+    def __init__(self, *, min_instances=5, max_depth=4):
         self.min_instances = min_instances
         self.max_depth = max_depth
         self.splitter = None
@@ -40,6 +34,7 @@ class Tree:
         self.categorical_attributes = None
         self.numerical_attributes = None
         self.pruning_strat = None
+        self.users_bound = {"0": [0, None]}  # Store user partitions per depth
 
     def fit(self, x, y, target_weights=None, rI=None, rU=None):
         """
@@ -84,7 +79,8 @@ class Tree:
         return self
 
     def build(self, x, y, instance_weights, parent_node, depth=0):
-        """Recursively build this predictive clustering tree."""
+        """Recursively build the decision tree using users_bound."""
+
         if depth > self.max_depth:
             print(f"🍃 Reached max depth at node {parent_node}. Stopping recursion.")
             self.size["leaf_count"] += 1
@@ -92,13 +88,12 @@ class Tree:
             node.make_leaf(y, instance_weights)
             return node
 
-        print("🌲 Building predictive clustering tree...")
+        print("🌲 Building predictive clustering tree at depth:", depth)
 
         # Select the best item (feature) for splitting
         best_item, criterion_value = self.splitter.find_best_split_item(x, y, instance_weights)
-        print("🔍 Best item for splitting: ", best_item)
+        print("🔍 Best item for splitting:", best_item)
 
-        # If no valid split is found, create a leaf node
         if best_item is None:
             print("🍃 Creating leaf node (no valid split found)...")
             self.size["leaf_count"] += 1
@@ -110,55 +105,46 @@ class Tree:
         self.size["node_count"] += 1
         node = Node(best_item, criterion_value, parent_node)
 
+        # Retrieve users at current depth
+        if depth == 0:
+            user_indices = dict(self.rU.keys())
+        else:
+            user_indices = self.users_bound[str(depth)]
+
+        print(type(user_indices))
+        print(type(self.users_bound[str(depth)]))
+        # user_indices_dict = dict(user_indices)  # Convert dict_keys to a dictionary
+        # values = list(user_indices_dict.values())
+    
+
         # Get all users who rated this item (rI lookup)
         users_rated_item = set(user for user, _ in self.rI.get(best_item, []))
-        print("👥 Users who rated item {}: {}".format(best_item, len(users_rated_item)))
+        print(f"👥 Users at depth {depth}: {len(user_indices)}")
+        print(f"🔍 Users who rated item {best_item}: {len(users_rated_item)}")
 
         # Classify users into three groups: Lovers, Haters, Unknowns
-        lovers = [u for u in users_rated_item if dict(self.rU[u]).get(best_item, 0) >= 4]  # Rating 4 or 5
-        haters = [u for u in users_rated_item if dict(self.rU[u]).get(best_item, 0) <= 3]  # Rating 3 or below
-        unknowns = [u for u in x.index if u not in users_rated_item]  # Users who have not rated this item
+        lovers = [u for u in users_rated_item if dict(self.rU[u]).get(best_item, 0) >= 4]
+        haters = [u for u in users_rated_item if dict(self.rU[u]).get(best_item, 0) <= 3]
+        unknowns = [u for u in list(user_indices.values()) if u not in users_rated_item]
 
-        print("❤️ Lovers:", len(lovers))
-        print("💔 Haters:", len(haters))
-        print("❓ Unknowns:", len(unknowns))
+        print(f"❤️ Lovers: {len(lovers)}")
+        print(f"💔 Haters: {len(haters)}")
+        print(f"❓ Unknowns: {len(unknowns)}")
 
-        # Ensure the selected users exist in x.index (avoid KeyError)
-        lovers = list(set(lovers) & set(x.index))
-        haters = list(set(haters) & set(x.index))
-        unknowns = list(set(unknowns) & set(x.index))
+        # Store user partitions in users_bound
+        self.users_bound[str(depth + 1)] = {
+            "lovers": lovers,
+            "haters": haters,
+            "unknowns": unknowns,
+        }
+        print(type(self.users_bound))
+        print(f"printing user_bound: {self.users_bound}")
 
-        # Extract subsets based on filtered indices
-        x_lovers, y_lovers = x.loc[lovers].copy(), y.loc[lovers].copy()
-        x_haters, y_haters = x.loc[haters].copy(), y.loc[haters].copy()
-        x_unknowns, y_unknowns = x.loc[unknowns].copy(), y.loc[unknowns].copy()
-
-        instance_weights_lovers = instance_weights.loc[lovers].copy()
-        instance_weights_haters = instance_weights.loc[haters].copy()
-        instance_weights_unknowns = instance_weights.loc[unknowns].copy()
-
-        # Reset indices to maintain consistency in recursion
-        x_lovers.reset_index(drop=True, inplace=True)
-        y_lovers.reset_index(drop=True, inplace=True)
-        x_haters.reset_index(drop=True, inplace=True)
-        y_haters.reset_index(drop=True, inplace=True)
-        x_unknowns.reset_index(drop=True, inplace=True)
-        y_unknowns.reset_index(drop=True, inplace=True)
-        
-
-        instance_weights_lovers.reset_index(drop=True, inplace=True)
-        instance_weights_haters.reset_index(drop=True, inplace=True)
-        instance_weights_unknowns.reset_index(drop=True, inplace=True)
-
-        # Recursively build the tree for each group
-        print("🔄 Recursively building tree for subsets...")
-        print(x_lovers)
-        print("....................")
-        print(y_lovers)
+        # Recursively build the tree using users_bound instead of dataset slicing
         node.children = [
-            self.build(x_lovers, y_lovers, instance_weights_lovers, node, depth + 1),
-            self.build(x_haters, y_haters, instance_weights_haters, node, depth + 1),
-            self.build(x_unknowns, y_unknowns, instance_weights_unknowns, node, depth + 1)
+            self.build(x.loc[lovers], y.loc[lovers], instance_weights.loc[lovers], node, depth + 1),
+            self.build(x.loc[haters], y.loc[haters], instance_weights.loc[haters], node, depth + 1),
+            self.build(x.loc[unknowns], y.loc[unknowns], instance_weights.loc[unknowns], node, depth + 1),
         ]
 
         return node
