@@ -22,7 +22,7 @@ class Tree:
     VERBOSE = False  # Verbosity level
     INITIAL_WEIGHT = 1.0  # The initial weight used for a sample.
 
-    def __init__(self, *, min_instances=7, max_depth=6):  # , ftest=0.01
+    def __init__(self, *, min_instances=7, max_depth=2):  # , ftest=0.01
         """Constructs a new predictive clustering tree (PCT).
 
         @param min_instances: The minimum number of (weighted) samples in a leaf node (stopping criterion).
@@ -41,7 +41,28 @@ class Tree:
         self.numerical_attributes = None
         self.pruning_strat = None
 
-    def fit(self, x, y, target_weights=None, rI=None, rU=None):
+
+
+    def create_rI_rU(self, x, y):
+        """Dynamically generate rI and rU dictionaries based on current subset."""
+        rI = {}
+        rU = {}
+
+        for user_id in x.index: # x is a DataFrame
+            for item_id, rating in zip(x.columns, x.loc[user_id]):
+                if rating > 0:  # Only consider rated items
+                    if item_id not in rI:
+                        rI[item_id] = []
+                    rI[item_id].append((user_id, rating))
+
+                    if user_id not in rU:
+                        rU[user_id] = []
+                    rU[user_id].append((item_id, rating))
+        
+        return rI, rU
+
+
+    def fit(self, x, y, target_weights=None):
         """
         Fit the predictive clustering tree on the given dataset and store rI and rU.
         """
@@ -52,10 +73,6 @@ class Tree:
         self.x = x
         self.y = y
         print("✅ Assigned x and y")
-
-        # Store rI and rU as attributes
-        self.rI = rI
-        self.rU = rU
 
         if utils.learning_task(y) == "classification":
             print("✅ Applying classification preprocessing...")
@@ -84,7 +101,8 @@ class Tree:
         return self
 
     def build(self, x, y, instance_weights, parent_node, depth=0):
-        """Recursively build this predictive clustering tree."""
+        """Recursively build this predictive clustering tree with updated rI and rU per subset."""
+
         if depth > self.max_depth:
             print(f"🍃 Reached max depth at node {parent_node}. Stopping recursion.")
             self.size["leaf_count"] += 1
@@ -98,7 +116,6 @@ class Tree:
         best_item, criterion_value = self.splitter.find_best_split_item(x, y, instance_weights)
         print("🔍 Best item for splitting: ", best_item)
 
-        # If no valid split is found, create a leaf node
         if best_item is None:
             print("🍃 Creating leaf node (no valid split found)...")
             self.size["leaf_count"] += 1
@@ -110,23 +127,23 @@ class Tree:
         self.size["node_count"] += 1
         node = Node(best_item, criterion_value, parent_node)
 
-        # Get all users who rated this item (rI lookup)
-        users_rated_item = set(user for user, _ in self.rI.get(best_item, []))
+        print(f"Type of x: {type(x)}")
+
+        # Create rI and rU dynamically based on current subset
+        rI_subset, rU_subset = self.create_rI_rU(x, y)
+
+        # Get all users who rated this item in the **current subset**
+        users_rated_item = set(user for user, _ in rI_subset.get(best_item, []))
         print("👥 Users who rated item {}: {}".format(best_item, len(users_rated_item)))
 
         # Classify users into three groups: Lovers, Haters, Unknowns
-        lovers = [u for u in users_rated_item if dict(self.rU[u]).get(best_item, 0) >= 4]  # Rating 4 or 5
-        haters = [u for u in users_rated_item if dict(self.rU[u]).get(best_item, 0) <= 3]  # Rating 3 or below
-        unknowns = [u for u in x.index if u not in users_rated_item]  # Users who have not rated this item
+        lovers = [u for u in users_rated_item if dict(rU_subset[u]).get(best_item, 0) >= 4]
+        haters = [u for u in users_rated_item if dict(rU_subset[u]).get(best_item, 0) <= 3]
+        unknowns = [u for u in x.index if u not in users_rated_item]
 
         print("❤️ Lovers:", len(lovers))
         print("💔 Haters:", len(haters))
         print("❓ Unknowns:", len(unknowns))
-
-        # Ensure the selected users exist in x.index (avoid KeyError)
-        lovers = list(set(lovers) & set(x.index))
-        haters = list(set(haters) & set(x.index))
-        unknowns = list(set(unknowns) & set(x.index))
 
         # Extract subsets based on filtered indices
         x_lovers, y_lovers = x.loc[lovers].copy(), y.loc[lovers].copy()
@@ -137,24 +154,10 @@ class Tree:
         instance_weights_haters = instance_weights.loc[haters].copy()
         instance_weights_unknowns = instance_weights.loc[unknowns].copy()
 
-        # Reset indices to maintain consistency in recursion
-        x_lovers.reset_index(drop=True, inplace=True)
-        y_lovers.reset_index(drop=True, inplace=True)
-        x_haters.reset_index(drop=True, inplace=True)
-        y_haters.reset_index(drop=True, inplace=True)
-        x_unknowns.reset_index(drop=True, inplace=True)
-        y_unknowns.reset_index(drop=True, inplace=True)
-        
 
-        instance_weights_lovers.reset_index(drop=True, inplace=True)
-        instance_weights_haters.reset_index(drop=True, inplace=True)
-        instance_weights_unknowns.reset_index(drop=True, inplace=True)
 
-        # Recursively build the tree for each group
+        # Recursively build the tree for each group with updated rI and rU
         print("🔄 Recursively building tree for subsets...")
-        print(x_lovers)
-        print("....................")
-        print(y_lovers)
         node.children = [
             self.build(x_lovers, y_lovers, instance_weights_lovers, node, depth + 1),
             self.build(x_haters, y_haters, instance_weights_haters, node, depth + 1),
@@ -162,6 +165,7 @@ class Tree:
         ]
 
         return node
+
 
     def make_splitter(self):
         """
