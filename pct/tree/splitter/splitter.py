@@ -66,7 +66,10 @@ class Splitter:
             )
             
             total_error = heuristic.squared_error_total()  # Compute total squared error
-            
+            # print item_id, total_error
+            # print("Item ID: ", item_id, "Total Error: ", total_error)
+
+
             # Select the item with the lowest squared error
             if total_error < lowest_error:
                 best_item = item_id
