@@ -25,7 +25,7 @@ class Splitter:
         @param ftest: The p-value (in [0,1]) used in the F-test for the statistical significance of a split.
         @param target_weights: The weights corresponding to the target variables.
         """
-        self.criterion = "variance"
+        self.criterion = "Squared Error"
         self.worst_performance = -1
         print("Initializing Splitter...")
         # self.ftest = FTest(ftest)
@@ -54,6 +54,7 @@ class Splitter:
         # Iterate over each item (column) in the user-item matrix
         for item_id in x.columns:
             item_ratings = x[item_id].values.reshape(-1, 1)  # Convert column to 2D array
+           
 
             # Skip items with too few ratings (ensure enough users per item)
             if np.count_nonzero(~np.isnan(item_ratings)) < self.min_instances:
@@ -62,21 +63,25 @@ class Splitter:
             # Compute squared error for this item using NumericHeuristic5
             heuristic = NumericHeuristic5(
                 self.criterion, self.target_weights, self.min_instances,
-                instance_weights, item_ratings, y
+                instance_weights, x, y
             )
             
-            total_error = heuristic.squared_error_total()  # Compute total squared error
-            # print item_id, total_error
-            # print("Item ID: ", item_id, "Total Error: ", total_error)
+            total_error = heuristic.squared_error_total(item_id)  # Compute total squared error
+            # print item_id and total_error
+            # print(item_id, total_error)
+            
+      
 
-
+            
             # Select the item with the lowest squared error
             if total_error < lowest_error:
                 best_item = item_id
                 lowest_error = total_error
-
+            
+            
         # If no valid item is found, return None (no split possible)
         return best_item, lowest_error if best_item is not None else (-np.inf)
+       
 
 
     

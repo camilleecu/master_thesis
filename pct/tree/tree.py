@@ -103,10 +103,10 @@ class Tree:
     def build(self, x, y, instance_weights, parent_node, depth=0):
         """Recursively build this predictive clustering tree with updated rI and rU per subset."""
 
-        if depth > self.max_depth:
-            print(f"🍃 Reached max depth at node {parent_node}. Stopping recursion.")
+        if depth == self.max_depth:
+            print(f"🍃 Reached max depth at depth {depth}. Stopping recursion.")
             self.size["leaf_count"] += 1
-            node = Node(parent=parent_node)
+            node = Node(parent=parent_node, depth=depth)
             node.make_leaf(y, instance_weights)
             return node
 
@@ -119,15 +119,15 @@ class Tree:
         if best_item is None:
             print("🍃 Creating leaf node (no valid split found)...")
             self.size["leaf_count"] += 1
-            node = Node(parent=parent_node)
+            node = Node(parent=parent_node, depth=depth)
             node.make_leaf(y, instance_weights)
             return node
 
         # Create a node for this item split
         self.size["node_count"] += 1
-        node = Node(best_item, criterion_value, parent_node)
+        node = Node(best_item, criterion_value, parent_node, depth)
 
-        print(f"Type of x: {type(x)}")
+        # print(f"Type of x: {type(x)}")
         print(f"Shape of x: {x.shape}")
 
         # Create rI and rU dynamically based on current subset
@@ -147,6 +147,10 @@ class Tree:
         print("❤️ Lovers:", len(lovers))
         print("💔 Haters:", len(haters))
         print("❓ Unknowns:", len(unknowns))
+
+        # assign the number of users to the node
+        node.set_num_users(len(lovers), len(haters), len(unknowns))
+
 
         # Extract subsets based on filtered indices
         x_lovers, y_lovers = x.loc[lovers].copy(), y.loc[lovers].copy()
@@ -333,24 +337,24 @@ class Tree:
 
         return list(decision_path.values())
 
-    def nodes(self):
-        nodes = []
-        queue = [self.root]
-        while len(queue) != 0:
-            node = queue.pop(0)
-            queue.extend(node.children)
-            nodes.append(node)
-        return nodes
+    # def nodes(self):
+    #     nodes = []
+    #     queue = [self.root]
+    #     while len(queue) != 0:
+    #         node = queue.pop(0)
+    #         queue.extend(node.children)
+    #         nodes.append(node)
+    #     return nodes
 
-    def leaves(self):
-        leaves = []
-        queue = [self.root]
-        while len(queue) != 0:
-            node = queue.pop(0)
-            queue.extend(node.children)
-            if node.is_leaf:
-                leaves.append(node)
-        return leaves
+    # def leaves(self):
+    #     leaves = []
+    #     queue = [self.root]
+    #     while len(queue) != 0:
+    #         node = queue.pop(0)
+    #         queue.extend(node.children)
+    #         if node.is_leaf:
+    #             leaves.append(node)
+    #     return leaves
 
     def print_tree_structure(self, node=None, level=0):
         """Prints the tree structure for debugging."""
@@ -363,48 +367,22 @@ class Tree:
         indent = " " * (level * 4)
 
         # Print basic information about the node
-        print(f"{indent}Node: {node.name}")
-        print(f"{indent}Attribute: {node.attribute_name}")
+        # print(f"{indent}Node: {node.name}")
+        # print(f"{indent}Node_ID: {node.id}")
+        print(f"{indent}Item_ID: {node.attribute_name}")
         # print(f"{indent}Value: {node.attribute_value}")
-        print(f"{indent}Criterion: {node.criterion_value}")
+        print(f"{indent}Depth: {node.depth}")
+        print(f"{indent}Lovers: {node.lovers_count}")
+        print(f"{indent}Haters: {node.haters_count}")
+        print(f"{indent}Unknowns: {node.unknowns_count}")
+        print(f"{indent}Total_Error: {node.criterion_value}")
 
         if node.is_leaf:
             print(f"{indent}Leaf Node: Yes")
-            print(f"{indent}Prediction: {node.prototype}")  # If the leaf node has a prediction (prototype)
+            # print(f"{indent}Prediction: {node.prototype}")  # If the leaf node has a prediction (prototype)
         else:
             print(f"{indent}Leaf Node: No")
             print(f"{indent}Children:")
             # Recursively print information for each child node
             for child in node.children:
                 self.print_tree_structure(child, level + 1)  # Increase the level for deeper indentation
-
-    def visualize_tree(self):
-        """Creates a graphical representation of the decision tree using networkx."""
-        graph = nx.DiGraph()
-        self._add_edges(self.root, graph)
-
-        plt.figure(figsize=(12, 8))
-        pos = nx.spring_layout(graph, seed=42)  # Positioning of nodes
-        labels = {node: data["label"] for node, data in graph.nodes(data=True)}
-
-        nx.draw(graph, pos, with_labels=True, labels=labels, node_size=3000, node_color="lightblue", edge_color="gray")
-        plt.title("Decision Tree Structure")
-        plt.show()
-
-    def _add_edges(self, node, graph, parent=None):
-        """Recursively adds edges to the graph for visualization."""
-        if node is None:
-            return
-        
-        # Assign a label for the node
-        node_label = f"{node.attribute_name}\nCriterion: {node.criterion_value}"
-        graph.add_node(node.name, label=node_label)
-
-        # Add an edge from the parent to the current node
-        if parent:
-            graph.add_edge(parent, node.name)
-
-        # Recursively add children
-        for child in node.children:
-            if child is not None:
-                self._add_edges(child, graph, node.name)

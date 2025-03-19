@@ -35,7 +35,7 @@ class Heuristic5:
         # Calculate the total statistics: sum, sum2, and n (number of non-zero ratings)
         sum_t = np.nansum(self.x, axis=0)
         sum2_t = np.nansum(self.x**2, axis=0)
-        n_t = np.count_nonzero(self.x, axis=0)  
+        n_t = np.count_nonzero((self.x != 0) & (~np.isnan(self.x)), axis=0)  
         return sum_t, sum2_t, n_t
     
     def stop_criteria(self, partition_sizes):
