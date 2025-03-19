@@ -128,9 +128,12 @@ class Tree:
         node = Node(best_item, criterion_value, parent_node)
 
         print(f"Type of x: {type(x)}")
+        print(f"Shape of x: {x.shape}")
 
         # Create rI and rU dynamically based on current subset
         rI_subset, rU_subset = self.create_rI_rU(x, y)
+        print("rI_subset: ", rI_subset)
+        print("rU_subset: ", rU_subset)
 
         # Get all users who rated this item in the **current subset**
         users_rated_item = set(user for user, _ in rI_subset.get(best_item, []))
