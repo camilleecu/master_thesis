@@ -107,15 +107,16 @@ class Tree:
 
         # Retrieve users at current depth
         if depth == 0:
-            user_indices = dict(self.rU.keys())
+            user_indices = list(self.rU.keys())
         else:
             user_indices = self.users_bound[str(depth)]
+        # Flatten user_indices before processing
+            # list_user_indices = user_indices['lovers'] + user_indices['haters'] + user_indices['unknowns']
+            # print(f"list_user_indices: {list_user_indices}")
 
-        print(type(user_indices))
-        print(type(self.users_bound[str(depth)]))
-        # user_indices_dict = dict(user_indices)  # Convert dict_keys to a dictionary
-        # values = list(user_indices_dict.values())
-    
+        print(f"user_indices: {type(user_indices)}")  
+        print(f"users_bound: {type(self.users_bound[str(depth)])}")    
+
 
         # Get all users who rated this item (rI lookup)
         users_rated_item = set(user for user, _ in self.rI.get(best_item, []))
@@ -125,7 +126,10 @@ class Tree:
         # Classify users into three groups: Lovers, Haters, Unknowns
         lovers = [u for u in users_rated_item if dict(self.rU[u]).get(best_item, 0) >= 4]
         haters = [u for u in users_rated_item if dict(self.rU[u]).get(best_item, 0) <= 3]
-        unknowns = [u for u in list(user_indices.values()) if u not in users_rated_item]
+        unknowns = [u for u in user_indices if u not in users_rated_item]
+        
+
+   
 
         print(f"❤️ Lovers: {len(lovers)}")
         print(f"💔 Haters: {len(haters)}")
@@ -137,7 +141,7 @@ class Tree:
             "haters": haters,
             "unknowns": unknowns,
         }
-        print(type(self.users_bound))
+        print(f"printing user_bound: {type(self.users_bound)}")
         print(f"printing user_bound: {self.users_bound}")
 
         # Recursively build the tree using users_bound instead of dataset slicing
