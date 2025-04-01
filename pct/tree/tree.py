@@ -262,7 +262,7 @@ class Tree:
         if item_id is None:
             return res
         for item, user_ratings in node.ri.items():
-            if len(user_ratings) > 5:
+            if len(user_ratings) > 4:
                 res[item] = np.mean([rating for user, rating in user_ratings])
         if pd.isna(rating) or rating == 0:
             self.predict_instance(instance, node.children[2], res)  # Unknowns
@@ -324,7 +324,7 @@ class Tree:
             res = self.predict_instance(instance, self.root, {})
             row_pred = []
             for col in x.columns:
-                if instance[col] == 0:  # 未评分项才预测
+                if instance[col] == 0:  # unrated
                     row_pred.append(res.get(col, np.nan))
                 else:
                     row_pred.append(np.nan)
