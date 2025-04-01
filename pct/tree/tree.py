@@ -262,7 +262,7 @@ class Tree:
         if item_id is None:
             return res
         for item, user_ratings in node.ri.items():
-            if len(user_ratings) > 0:
+            if len(user_ratings) > 5:
                 res[item] = np.mean([rating for user, rating in user_ratings])
         if pd.isna(rating) or rating == 0:
             self.predict_instance(instance, node.children[2], res)  # Unknowns
