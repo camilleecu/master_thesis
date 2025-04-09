@@ -22,9 +22,8 @@ class Tree:
     VERBOSE = False  # Verbosity level
     INITIAL_WEIGHT = 1.0  # The initial weight used for a sample.
 
-    def __init__(self, *, min_instances=7, max_depth=2):  # , ftest=0.01
+    def __init__(self, *, min_instances=7, max_depth=3):  # , ftest=0.01
         """Constructs a new predictive clustering tree (PCT).
-
         @param min_instances: The minimum number of (weighted) samples in a leaf node (stopping criterion).
         @param ftest: The p-value (in [0,1]) used in the F-test for the statistical significance of a split.
         """
@@ -41,14 +40,11 @@ class Tree:
         self.numerical_attributes = None
         self.pruning_strat = None
 
-
-
     def create_rI_rU(self, x, y):
         """Dynamically generate rI and rU dictionaries based on current subset."""
         rI = {}
         rU = {}
-
-        for user_id in x.index: # x is a DataFrame
+        for user_id in x.index:  # x is a DataFrame
             for item_id, rating in zip(x.columns, x.loc[user_id]):
                 if rating > 0:  # Only consider rated items
                     if item_id not in rI:
@@ -58,11 +54,9 @@ class Tree:
                     if user_id not in rU:
                         rU[user_id] = []
                     rU[user_id].append((item_id, rating))
-        
         return rI, rU
 
-
-    def fit(self, x, y, target_weights=None):
+    def fit(self, x, y, target_weights=None): #target_weights=None
         """
         Fit the predictive clustering tree on the given dataset and store rI and rU.
         """
@@ -73,6 +67,7 @@ class Tree:
         self.x = x
         self.y = y
         print("✅ Assigned x and y")
+    
 
         if utils.learning_task(y) == "classification":
             print("✅ Applying classification preprocessing...")
@@ -125,15 +120,15 @@ class Tree:
 
         # Create a node for this item split
         self.size["node_count"] += 1
-        node = Node(best_item, criterion_value, parent_node, depth)
-
-        # print(f"Type of x: {type(x)}")
-        print(f"Shape of x: {x.shape}")
+        node = Node(best_item, criterion_value, parent_node, depth, item_id=best_item)
+        node.user_ids = x.index.tolist()
+        print("🧩 Created node for item:", best_item)
+        print("user_ids:", node.user_ids)
 
         # Create rI and rU dynamically based on current subset
         rI_subset, rU_subset = self.create_rI_rU(x, y)
-        print("rI_subset: ", rI_subset)
-        print("rU_subset: ", rU_subset)
+        node.ru = rU_subset
+        node.ri = rI_subset
 
         # Get all users who rated this item in the **current subset**
         users_rated_item = set(user for user, _ in rI_subset.get(best_item, []))
@@ -148,9 +143,8 @@ class Tree:
         print("💔 Haters:", len(haters))
         print("❓ Unknowns:", len(unknowns))
 
-        # assign the number of users to the node
+        # Assign the number of users to the node
         node.set_num_users(len(lovers), len(haters), len(unknowns))
-
 
         # Extract subsets based on filtered indices
         x_lovers, y_lovers = x.loc[lovers].copy(), y.loc[lovers].copy()
@@ -161,8 +155,6 @@ class Tree:
         instance_weights_haters = instance_weights.loc[haters].copy()
         instance_weights_unknowns = instance_weights.loc[unknowns].copy()
 
-
-
         # Recursively build the tree for each group with updated rI and rU
         print("🔄 Recursively building tree for subsets...")
         node.children = [
@@ -172,7 +164,6 @@ class Tree:
         ]
 
         return node
-
 
     def make_splitter(self):
         """
@@ -214,36 +205,35 @@ class Tree:
         proportion = (partition_size - len(missing_index)) / (total_size - len(missing_index))
         # subset (total - missing)
         node_instance_weights.loc[missing_index] = node_instance_weights.loc[missing_index] * proportion
-        # print (proportion)
         return node_instance_weights
 
-    def postProcess(self, node):
-        """
-        For classification tasks, recursively prunes leaves under the given node, if they have
-        the same parent and same prediction prototype.
+    # def postProcess(self, node):
+    #     """
+    #     For classification tasks, recursively prunes leaves under the given node, if they have
+    #     the same parent and same prediction prototype.
 
-        @param node: The 'root' node for this operation.
-        """
-        # Recursively applies L{postProcessSamePrediction} on each (in)direct child node of 
-        # the given node. The children are handled in postfix order, i.e. all children are 
-        # handled before the parent. This is important to correctly prune leaves iteratively.
-        for n in node.children:
-            self.postProcess(n)
-        self.postProcessSamePrediction(node)
+    #     @param node: The 'root' node for this operation.
+    #     """
+    #     # Recursively applies L{postProcessSamePrediction} on each (in)direct child node of 
+    #     # the given node. The children are handled in postfix order, i.e. all children are 
+    #     # handled before the parent. This is important to correctly prune leaves iteratively.
+    #     for n in node.children:
+    #         self.postProcess(n)
+    #     self.postProcessSamePrediction(node)
 
-    def postProcessSamePrediction(self, node, pruning_strat=None):
-        """
-        If the children of the given node are leaves which give the same output for
-        L{get_prediction}, prunes them away with Node's L{make_leaf_prune}.
+    # def postProcessSamePrediction(self, node, pruning_strat=None):
+    #     """
+    #     If the children of the given node are leaves which give the same output for
+    #     L{get_prediction}, prunes them away with Node's L{make_leaf_prune}.
 
-        @param node: The node whose children should be considered.
-        @param pruning_strat: TODO unused.
-        """
-        if (~node.is_leaf
-                and node.children[0].is_leaf
-                and self.get_prediction(node.children[0]) == self.get_prediction(node.children[1])
-        ):
-            node.make_leaf_prune(node.children[0], node.children[1])
+    #     @param node: The node whose children should be considered.
+    #     @param pruning_strat: TODO unused.
+    #     """
+    #     if (~node.is_leaf
+    #             and node.children[0].is_leaf
+    #             and self.get_prediction(node.children[0]) == self.get_prediction(node.children[1])
+    #     ):
+    #         node.make_leaf_prune(node.children[0], node.children[1])
 
     def get_prediction(self, leaf):
         """Returns the prediction prototype for the given leaf."""
@@ -251,110 +241,127 @@ class Tree:
             return np.argmax(leaf.prototype)  ## gimmick to get the same output as clus
         return -1
 
-    def predict(self, x, single_label=False):
-        """Predicts the labels for each instance in the given dataset.
+    # def decision_path(self, x: pd.DataFrame):
+    #     """Returns the decision path for each instance in the given dataset.
 
-        @param x: Dataframe containing instances and features (rows and columns).
-        @param single_label: For classification problems, whether to return the target (class)
-            containing the highest score instead of the prediction probabilities.
-        @return: Target predictions (regression) or prediction probabilities (classification).
-        """
-        x = pd.DataFrame(x)
-        predictions = np.array([
-            self.predict_instance(instance, self.root)
-            for _, instance in x.iterrows()
-        ])
-        return np.argmax(predictions, axis=1) if single_label else predictions
+    #     The decision path is a binary vector (taking the role of a feature representation),
+    #     representing the nodes that an instance passes through (1). To deal with missing values,
+    #     we turn this into a real vector representing the proportion of the instance that
+    #     passes through each node. The tree is traversed with a breadth-first search.
 
-    def predict_instance(self, instance, node):
-        """Recursively predict the given instance over the nodes of this tree.
-        
-        @param instance: The single instance to predict.
-        @param node: The current node in the recursive process.
-        """
-        # When in a leaf, return the prototype
+    #     @param x: Dataframe containing instances and features (rows and columns).
+    #     @return: The decision path for each instance in the input dataset.
+    #     """
+    #     return np.array([
+    #         self.decision_path_instance(instance) for index, instance in x.iterrows()
+    #     ])
+
+    # def decision_path_instance(self, x):
+    #     """Build the decision path for the given instance.
+
+    #     @param x: The (single) instance to make a decision path of.
+    #     @param node: The current node in the recursive process.
+    #     """
+    #     decision_path = OrderedDict()  # (key, value) = (visited node, decision path value)
+    #     decision_path[self.root] = 1  # Root is always fully visited
+    #     queue = [self.root]  # Stopping criterion
+
+    #     while len(queue) != 0:
+    #         # Loop management
+    #         node = queue.pop(0)
+    #         if len(node.children) == 0:
+    #             continue  # Nothing left to set here
+    #         queue.extend(node.children)
+
+    #         # Set the decision path values
+    #         value = np.array(x[node.attribute_name])
+    #         if utils.is_missing(value):
+    #             decision_path[node.children[0]] = decision_path[node] * node.proportion_left
+    #             decision_path[node.children[1]] = decision_path[node] * node.proportion_right
+    #         else:
+    #             goLeft = utils.is_in_left_branch(value, node.attribute_value)
+    #             goLeft = bool(goLeft)  # Fix for weird python.bool vs numpy.bool stuff
+    #             decision_path[node.children[0]] = decision_path[node] if goLeft else 0
+    #             decision_path[node.children[1]] = decision_path[node] if ~goLeft else 0
+
+    #     return list(decision_path.values())
+
+    def predict_instance(self, instance, node, res: dict):
         if node.is_leaf:
-            prototype = np.mean(node.prototype)  # Camille
-            # Sometimes there are missing target values in the prototype.
-            while np.isnan(prototype).any() and node.parent is not None:
-                node = node.parent
-                prototype = node.prototype
-            return prototype
+            # Compute mean ratings for all items in the leaf node
+            for item, user_ratings in node.ri.items():
+                if user_ratings:
+                    res[item] = np.mean([rating for _, rating in user_ratings])
+            return res
 
-        # Call this function recursively
-        value = np.array(instance[node.attribute_name])
-        if utils.is_missing(value):
-            left_prediction = node.proportion_left * self.predict_instance(instance, node.children[0])
-            right_prediction = node.proportion_right * self.predict_instance(instance, node.children[1])
-            return left_prediction + right_prediction
+        item_id = node.attribute_name
+        rating = instance.get(item_id, 0)
+
+        # Traverse to child nodes based on user's rating
+        if pd.isna(rating) or rating == 0:
+            return self.predict_instance(instance, node.children[2], res)  # Unknowns
+        elif rating >= 4:
+            return self.predict_instance(instance, node.children[0], res)  # Lovers
         else:
-            # 0 (false) if left, 1 (true) if right
-            child = ~utils.is_in_left_branch(value, node.attribute_value)
-            return self.predict_instance(instance, node.children[child])
+            return self.predict_instance(instance, node.children[1], res)  # Haters
 
-    def decision_path(self, x):
-        """Returns the decision path for each instance in the given dataset.
 
-        The decision path is a binary vector (taking the role of a feature representation),
-        representing the nodes that an instance passes through (1). To deal with missing values,
-        we turn this into a real vector representing the proportion of the instance that
-        passes through each node. The tree is traversed with a breadth-first search.
-        
-        @param x: Dataframe containing instances and features (rows and columns).
-        @return: The decision path for each instance in the input dataset.
+    def predict_test(self, x: pd.DataFrame):
+        x = pd.DataFrame(x)
+        predictions = []
+        for _, instance in x.iterrows():
+            res = self.predict_instance(instance, self.root, {})
+            row_pred = []
+            for col in x.columns:
+                if instance[col] == 0:  # Predict only unrated items
+                    row_pred.append(res.get(col, np.nan))
+                else:
+                    row_pred.append(np.nan)
+            predictions.append(row_pred)
+        return pd.DataFrame(predictions, index=x.index, columns=x.columns)
+
+
+    def calculate_rmse(self, test_data: pd.DataFrame, max_depth: int):
+        # Filter users who rated exactly `max_depth` items
+        users_with_x_ratings = test_data[test_data.count(axis=1) == max_depth]
+
+        # Predict using the leaf nodes reached after `max_depth` splits
+        predictions = self.predict_test(users_with_x_ratings)
+        targets = users_with_x_ratings.fillna(0)
+
+        # Compute RMSE on non-zero targets
+        mask = targets != 0
+        target_nonzero = targets.values[mask.values]
+        predict_nonzero = predictions.values[mask.values]
+        mse = np.mean((target_nonzero - predict_nonzero) ** 2)
+        return np.sqrt(mse)
+
+    def get_top_n_df_for_all_users(self, pred_matrix: pd.DataFrame, N=5):
         """
-        return np.array([
-            self.decision_path_instance(instance) for index, instance in x.iterrows()
-        ])
+        Generate Top-N item recommendations for all users based on a prediction matrix.
 
-    def decision_path_instance(self, x):
-        """Build the decision path for the given instance.
-        
-        @param x: The (single) instance to make a decision path of.
-        @param node: The current node in the recursive process.
+        Parameters:
+        - pred_matrix: pd.DataFrame, prediction scores (e.g., from predict_test()), 
+                    with users as rows and items as columns.
+        - N: int, number of items to recommend per user.
+
+        Returns:
+        - pd.DataFrame with columns: user_id, top_1, top_2, ..., top_N
         """
-        decision_path = OrderedDict()  # (key, value) = (visited node, decision path value)
-        decision_path[self.root] = 1  # Root is always fully visited
-        queue = [self.root]  # Stopping criterion
+        records = []
 
-        while len(queue) != 0:
-            # Loop management
-            node = queue.pop(0)
-            if len(node.children) == 0:
-                continue  # Nothing left to set here
-            queue.extend(node.children)
+        for user_id in pred_matrix.index:
+            user_pred = pred_matrix.loc[user_id]
+            top_items = user_pred.dropna().sort_values(ascending=False).head(N)
+            # Fill in missing values with NaN if less than N items
+            row = [user_id] + list(top_items.index) + [np.nan] * (N - len(top_items))
+            records.append(row)
 
-            # Set the decision path values
-            value = np.array(x[node.attribute_name])
-            if utils.is_missing(value):
-                decision_path[node.children[0]] = decision_path[node] * node.proportion_left
-                decision_path[node.children[1]] = decision_path[node] * node.proportion_right
-            else:
-                goLeft = utils.is_in_left_branch(value, node.attribute_value)
-                goLeft = bool(goLeft)  # Fix for weird python.bool vs numpy.bool stuff
-                decision_path[node.children[0]] = decision_path[node] if goLeft else 0
-                decision_path[node.children[1]] = decision_path[node] if ~goLeft else 0
+        columns = ['user_id'] + [f'top_{i+1}' for i in range(N)]
+        return pd.DataFrame(records, columns=columns)
 
-        return list(decision_path.values())
-
-    # def nodes(self):
-    #     nodes = []
-    #     queue = [self.root]
-    #     while len(queue) != 0:
-    #         node = queue.pop(0)
-    #         queue.extend(node.children)
-    #         nodes.append(node)
-    #     return nodes
-
-    # def leaves(self):
-    #     leaves = []
-    #     queue = [self.root]
-    #     while len(queue) != 0:
-    #         node = queue.pop(0)
-    #         queue.extend(node.children)
-    #         if node.is_leaf:
-    #             leaves.append(node)
-    #     return leaves
+    @staticmethod
+    
 
     def print_tree_structure(self, node=None, level=0):
         """Prints the tree structure for debugging."""
@@ -367,21 +374,14 @@ class Tree:
         indent = " " * (level * 4)
 
         # Print basic information about the node
-        # print(f"{indent}Node: {node.name}")
-        # print(f"{indent}Node_ID: {node.id}")
-        print(f"{indent}Item_ID: {node.attribute_name}")
-        # print(f"{indent}Value: {node.attribute_value}")
-        print(f"{indent}Depth: {node.depth}")
-        print(f"{indent}Lovers: {node.lovers_count}")
-        print(f"{indent}Haters: {node.haters_count}")
-        print(f"{indent}Unknowns: {node.unknowns_count}")
-        print(f"{indent}Total_Error: {node.criterion_value}")
-
         if node.is_leaf:
             print(f"{indent}Leaf Node: Yes")
-            # print(f"{indent}Prediction: {node.prototype}")  # If the leaf node has a prediction (prototype)
+            print(f"{indent}Depth: {node.depth}")
         else:
             print(f"{indent}Leaf Node: No")
+            print(f"{indent}Depth: {node.depth}")
+            print(f"{indent}Item_ID: {node.attribute_name}")
+            print(f"{indent}Total_Error: {node.criterion_value}")
             print(f"{indent}Children:")
             # Recursively print information for each child node
             for child in node.children:

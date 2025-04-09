@@ -28,8 +28,10 @@ class Node:
         self.depth = depth
 
         # Assign values from tree.py
-        self.attribute_name = attribute_name  # Best feature for splitting
+        self.attribute_name = attribute_name  # Best item for splitting
         self.criterion_value = criterion_value  # Split quality metric
+        self.user_ids = []  # Add this line to store user IDs
+
 
         # Tracking users in the node
         self.lovers_count = 0  # Users who love the item
