@@ -178,6 +178,18 @@ def matrix_to_df(x,r,c):
         d.append({'user_id':r[i],'item_id':c[j],'rating':v})
     return pd.DataFrame.from_dict(d)
 
+"""
+Behavior: Only converts non-zero entries from the sparse matrix to DataFrame rows
+
+Output:
+
+Contains only actual ratings
+
+May miss items with zero interactions
+
+Example: If item_123 has no ratings, it won't appear in the DataFrame
+"""
+
 def matrix_to_df_2(x,r,c):
     d = []
     cx = x.tocoo()
@@ -188,6 +200,16 @@ def matrix_to_df_2(x,r,c):
         if j ==0:
             d.append({'user_id':r[0],'item_id':c[i],'rating':0})
     return pd.DataFrame.from_dict(d)
+
+"""
+Checks for items with zero total interactions (cx.sum(0) == 0)
+
+Adds artificial rows for these items:
+
+Uses first user's ID (r)
+
+Sets rating to 0 (even if zero wasn't in original data)
+"""
 
 def set_intersection(a,b):
     return list(set(a).intersection(set(b)))
@@ -235,3 +257,13 @@ def Grid_tune(X,Y,model,params,c_v=5,jobs=-1,score='neg_mean_squared_error'):
                     verbose=True)
     reg_bay.fit(X, Y)
     return reg_bay, reg_bay.best_params_
+
+
+def matrix_to_full_df(sparse_matrix, idx_to_rid, idx_to_cid):
+    """
+    Convert sparse matrix to full DataFrame with original user_id / item_id
+    """
+    dense_array = sparse_matrix.toarray()
+    user_ids = [idx_to_rid[i] for i in range(dense_array.shape[0])]
+    item_ids = [idx_to_cid[i] for i in range(dense_array.shape[1])]
+    return pd.DataFrame(dense_array, index=user_ids, columns=item_ids)

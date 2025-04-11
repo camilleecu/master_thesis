@@ -62,27 +62,29 @@ class Tree:
         """
         x = pd.DataFrame(x)
         y = pd.DataFrame(y)
-        print("✅ Converted x and y to DataFrame")
+        # x = x.reset_index(drop=True)  # Add this line
+        # y = y.reset_index(drop=True)  # Add this line
+        # print("✅ Converted x and y to DataFrame")
 
         self.x = x
         self.y = y
-        print("✅ Assigned x and y")
+        # print("✅ Assigned x and y")
     
 
         if utils.learning_task(y) == "classification":
-            print("✅ Applying classification preprocessing...")
+            # print("✅ Applying classification preprocessing...")
             self.y = utils.create_prototypes(y)
 
-        print("✅ Creating target weights...")
+        # print("✅ Creating target weights...")
         self.target_weights = target_weights
         if target_weights is None:
             self.target_weights = utils.get_target_weights(self.y)
 
-        print("✅ Identifying numerical and categorical attributes...")
+        # print("✅ Identifying numerical and categorical attributes...")
         self.numerical_attributes = x.select_dtypes(include=np.number).columns
         self.categorical_attributes = x.select_dtypes(exclude=np.number).columns
 
-        print("✅ Creating Splitter...")
+        # print("✅ Creating Splitter...")
         self.splitter = self.make_splitter()
 
         if self.splitter is None:
@@ -101,20 +103,23 @@ class Tree:
         if depth == self.max_depth:
             print(f"🍃 Reached max depth at depth {depth}. Stopping recursion.")
             self.size["leaf_count"] += 1
-            node = Node(parent=parent_node, depth=depth)
+            node = Node(parent_node, depth=depth)
+            node.user_ids = x.index.tolist() 
+            # node.user_ids = x.index.values # for tree elicitation
             node.make_leaf(y, instance_weights)
             return node
 
-        print("🌲 Building predictive clustering tree...")
 
         # Select the best item (feature) for splitting
         best_item, criterion_value = self.splitter.find_best_split_item(x, y, instance_weights)
-        print("🔍 Best item for splitting: ", best_item)
+        # print("🔍 Best item for splitting: ", best_item)
 
         if best_item is None:
             print("🍃 Creating leaf node (no valid split found)...")
             self.size["leaf_count"] += 1
-            node = Node(parent=parent_node, depth=depth)
+            node = Node(parent_node, depth = depth)
+            node.user_ids = x.index.tolist() 
+            # node.user_ids = x.index.values # for tree elicitation
             node.make_leaf(y, instance_weights)
             return node
 
@@ -122,26 +127,27 @@ class Tree:
         self.size["node_count"] += 1
         node = Node(best_item, criterion_value, parent_node, depth, item_id=best_item)
         node.user_ids = x.index.tolist()
-        print("🧩 Created node for item:", best_item)
-        print("user_ids:", node.user_ids)
+        # node.user_ids = x.index.values
+        # print("🧩 Created node for item:", best_item)
+        # print("user_ids:", node.user_ids)
 
         # Create rI and rU dynamically based on current subset
         rI_subset, rU_subset = self.create_rI_rU(x, y)
-        node.ru = rU_subset
-        node.ri = rI_subset
+        # node.ru = rU_subset
+        # node.ri = rI_subset
 
         # Get all users who rated this item in the **current subset**
         users_rated_item = set(user for user, _ in rI_subset.get(best_item, []))
-        print("👥 Users who rated item {}: {}".format(best_item, len(users_rated_item)))
+       #  print("👥 Users who rated item {}: {}".format(best_item, len(users_rated_item)))
 
         # Classify users into three groups: Lovers, Haters, Unknowns
         lovers = [u for u in users_rated_item if dict(rU_subset[u]).get(best_item, 0) >= 4]
         haters = [u for u in users_rated_item if dict(rU_subset[u]).get(best_item, 0) <= 3]
         unknowns = [u for u in x.index if u not in users_rated_item]
 
-        print("❤️ Lovers:", len(lovers))
-        print("💔 Haters:", len(haters))
-        print("❓ Unknowns:", len(unknowns))
+        # print("❤️ Lovers:", len(lovers))
+        # print("💔 Haters:", len(haters))
+        # print("❓ Unknowns:", len(unknowns))
 
         # Assign the number of users to the node
         node.set_num_users(len(lovers), len(haters), len(unknowns))
@@ -150,6 +156,8 @@ class Tree:
         x_lovers, y_lovers = x.loc[lovers].copy(), y.loc[lovers].copy()
         x_haters, y_haters = x.loc[haters].copy(), y.loc[haters].copy()
         x_unknowns, y_unknowns = x.loc[unknowns].copy(), y.loc[unknowns].copy()
+
+
 
         instance_weights_lovers = instance_weights.loc[lovers].copy()
         instance_weights_haters = instance_weights.loc[haters].copy()
@@ -360,7 +368,6 @@ class Tree:
         columns = ['user_id'] + [f'top_{i+1}' for i in range(N)]
         return pd.DataFrame(records, columns=columns)
 
-    @staticmethod
     
 
     def print_tree_structure(self, node=None, level=0):
@@ -377,12 +384,43 @@ class Tree:
         if node.is_leaf:
             print(f"{indent}Leaf Node: Yes")
             print(f"{indent}Depth: {node.depth}")
+            print(f"user_ids: {node.user_ids}")
         else:
             print(f"{indent}Leaf Node: No")
             print(f"{indent}Depth: {node.depth}")
             print(f"{indent}Item_ID: {node.attribute_name}")
+            print(f"user_ids: {node.user_ids}")
             print(f"{indent}Total_Error: {node.criterion_value}")
             print(f"{indent}Children:")
             # Recursively print information for each child node
             for child in node.children:
                 self.print_tree_structure(child, level + 1)  # Increase the level for deeper indentation
+
+
+    def get_nodes_by_level(self, level):
+        """
+        Retrieve all nodes at a specific level in the tree.
+        
+        :param level: The depth level to retrieve nodes from (0-indexed).
+        :return: A list of nodes at the specified level.
+        """
+        if self.root is None:
+            return []
+
+        # Use BFS to traverse the tree and collect nodes at the specified level
+        queue = [(self.root, 0)]  # Queue of (node, current_level)
+        nodes_at_level = []
+
+        while queue:
+            node, current_level = queue.pop(0)
+
+            # If we reach the desired level, collect the node
+            if current_level == level:
+                nodes_at_level.append(node)
+            elif current_level < level:
+                # Add children to the queue for further exploration
+                for child in node.children:
+                    if child is not None:
+                        queue.append((child, current_level + 1))
+
+        return nodes_at_level
