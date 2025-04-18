@@ -79,7 +79,7 @@ class Node:
 
         # Add the total error (criterion value) for reporting
         total_error = self.criterion_value  # Assuming this stores the error
-        print(f"Total Error (Criterion Value): {total_error}")
+        # print(f"Total Error (Criterion Value): {total_error}")
         
         return prototype, summed_weights 
 

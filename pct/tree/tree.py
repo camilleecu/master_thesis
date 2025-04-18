@@ -99,9 +99,10 @@ class Tree:
 
     def build(self, x, y, instance_weights, parent_node, depth=0):
         """Recursively build this predictive clustering tree with updated rI and rU per subset."""
+        # print("🔄 Building tree at depth:", depth)
 
         if depth == self.max_depth:
-            print(f"🍃 Reached max depth at depth {depth}. Stopping recursion.")
+            # print(f"🍃 Reached max depth at depth {depth}. Stopping recursion.")
             self.size["leaf_count"] += 1
             node = Node(parent_node, depth=depth)
             node.user_ids = x.index.tolist() 
@@ -115,7 +116,7 @@ class Tree:
         # print("🔍 Best item for splitting: ", best_item)
 
         if best_item is None:
-            print("🍃 Creating leaf node (no valid split found)...")
+            # print("🍃 Creating leaf node (no valid split found)...")
             self.size["leaf_count"] += 1
             node = Node(parent_node, depth = depth)
             node.user_ids = x.index.tolist() 
@@ -164,7 +165,7 @@ class Tree:
         instance_weights_unknowns = instance_weights.loc[unknowns].copy()
 
         # Recursively build the tree for each group with updated rI and rU
-        print("🔄 Recursively building tree for subsets...")
+        # print("🔄 Recursively building tree for subsets...")
         node.children = [
             self.build(x_lovers, y_lovers, instance_weights_lovers, node, depth + 1),
             self.build(x_haters, y_haters, instance_weights_haters, node, depth + 1),
