@@ -48,6 +48,106 @@ def threshold_interactions_df(df, row_name, col_name, row_min, col_min):
     print('Sparsity: {:4.3f}%'.format(sparsity))
     return df
 
+def threshold_interactions_df_plus(
+    df,
+    user_col='user_id',
+    item_col='item_id',
+    artist_col='artist_id',
+    genre_col='genre_ids',  
+    min_items_per_user=100,
+    min_artists_per_user=20,
+    min_genres_per_user=10,
+    min_users_per_item=100,
+    verbose=True
+):
+    """
+    Filters a user-item interaction dataframe by enforcing minimum thresholds on:
+    1. Number of items per user
+    2. Number of users per item
+    3. Number of distinct artists per user
+    4. Number of distinct genres per user
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        The interaction dataframe containing user_id, item_id, artist_id, and genre_id(s).
+    user_col : str
+        Column name for user ID.
+    item_col : str
+        Column name for item ID.
+    artist_col : str
+        Column name for artist ID.
+    genre_col : str
+        Column name for genre ID (should be a list or allow explode).
+    min_items_per_user : int
+        Minimum number of items a user must have interacted with.
+    min_artists_per_user : int
+        Minimum number of unique artists a user must have interacted with.
+    min_genres_per_user : int
+        Minimum number of unique genres a user must have interacted with.
+    min_users_per_item : int
+        Minimum number of users that must have interacted with an item.
+    verbose : bool
+        Whether to print filtering and sparsity information.
+
+    Returns
+    -------
+    pd.DataFrame
+        The filtered interaction dataframe.
+    """
+
+    df_filtered = df.copy()
+
+    # Initial sparsity
+    n_users = df_filtered[user_col].nunique()
+    n_items = df_filtered[item_col].nunique()
+    sparsity = 100 * df_filtered.shape[0] / (n_users * n_items)
+    if verbose:
+        print(f"Initial: users = {n_users}, items = {n_items}, sparsity = {sparsity:.4f}%")
+
+    # ---------- Step 1: Filter by items per user and users per item ----------
+    done = False
+    while not done:
+        starting_shape = df_filtered.shape[0]
+
+        user_counts = df_filtered.groupby(user_col)[item_col].count()
+        df_filtered = df_filtered[df_filtered[user_col].isin(user_counts[user_counts >= min_items_per_user].index)]
+
+        item_counts = df_filtered.groupby(item_col)[user_col].count()
+        df_filtered = df_filtered[df_filtered[item_col].isin(item_counts[item_counts >= min_users_per_item].index)]
+
+        if df_filtered.shape[0] == starting_shape:
+            done = True
+
+    n_users = df_filtered[user_col].nunique()
+    n_items = df_filtered[item_col].nunique()
+    sparsity = 100 * df_filtered.shape[0] / (n_users * n_items)
+    if verbose:
+        print(f"After item filtering: users = {n_users}, items = {n_items}, sparsity = {sparsity:.4f}%")
+
+    # ---------- Step 2: Filter by number of unique artists per user ----------
+    df_artist_valid = df_filtered[df_filtered[artist_col] != 0]
+    artist_per_user = df_artist_valid.groupby(user_col)[artist_col].nunique()
+
+    # ---------- Step 3: Filter by number of unique genres per user ----------
+    df_genre_exploded = df_filtered.explode(genre_col)
+    df_genre_exploded = df_genre_exploded[df_genre_exploded[genre_col] != 0]
+    genre_per_user = df_genre_exploded.groupby(user_col)[genre_col].nunique()
+
+    # ---------- Step 4: User intersection ----------
+    valid_users = set(artist_per_user[artist_per_user > min_artists_per_user].index) & \
+                  set(genre_per_user[genre_per_user > min_genres_per_user].index)
+
+    final_df = df_filtered[df_filtered[user_col].isin(valid_users)]
+
+    n_users = final_df[user_col].nunique()
+    n_items = final_df[item_col].nunique()
+    sparsity = 100 * final_df.shape[0] / (n_users * n_items)
+    if verbose:
+        print(f"Final: users = {n_users}, items = {n_items}, sparsity = {sparsity:.4f}%")
+
+    return final_df
+
 def train_test_split(interactions, split_count, fraction=None):
     """
     Desc:
