@@ -142,8 +142,8 @@ class Tree:
        #  print("👥 Users who rated item {}: {}".format(best_item, len(users_rated_item)))
 
         # Classify users into three groups: Lovers, Haters, Unknowns
-        lovers = [u for u in users_rated_item if dict(rU_subset[u]).get(best_item, 0) >= 4]
-        haters = [u for u in users_rated_item if dict(rU_subset[u]).get(best_item, 0) <= 3]
+        lovers = [u for u in users_rated_item if dict(rU_subset[u]).get(best_item, 0) > 50]
+        haters = [u for u in users_rated_item if dict(rU_subset[u]).get(best_item, 0) <= 50]
         unknowns = [u for u in x.index if u not in users_rated_item]
 
         # print("❤️ Lovers:", len(lovers))

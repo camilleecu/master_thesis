@@ -4,7 +4,6 @@ import numpy as np
 # from skopt import BayesSearchCV
 # from sklearn.model_selection import GridSearchCV
 
-# Iteratively filters out users and items with fewer than the threshold number of interactions until no changes happen.
 def threshold_interactions_df(df, row_name, col_name, row_min, col_min):
     """
     Desc:
@@ -49,6 +48,106 @@ def threshold_interactions_df(df, row_name, col_name, row_min, col_min):
     print('Sparsity: {:4.3f}%'.format(sparsity))
     return df
 
+def threshold_interactions_df_plus(
+    df,
+    user_col='user_id',
+    item_col='item_id',
+    artist_col='artist_id',
+    genre_col='genre_ids',  
+    min_items_per_user=100,
+    min_artists_per_user=20,
+    min_genres_per_user=10,
+    min_users_per_item=100,
+    verbose=True
+):
+    """
+    Filters a user-item interaction dataframe by enforcing minimum thresholds on:
+    1. Number of items per user
+    2. Number of users per item
+    3. Number of distinct artists per user
+    4. Number of distinct genres per user
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        The interaction dataframe containing user_id, item_id, artist_id, and genre_id(s).
+    user_col : str
+        Column name for user ID.
+    item_col : str
+        Column name for item ID.
+    artist_col : str
+        Column name for artist ID.
+    genre_col : str
+        Column name for genre ID (should be a list or allow explode).
+    min_items_per_user : int
+        Minimum number of items a user must have interacted with.
+    min_artists_per_user : int
+        Minimum number of unique artists a user must have interacted with.
+    min_genres_per_user : int
+        Minimum number of unique genres a user must have interacted with.
+    min_users_per_item : int
+        Minimum number of users that must have interacted with an item.
+    verbose : bool
+        Whether to print filtering and sparsity information.
+
+    Returns
+    -------
+    pd.DataFrame
+        The filtered interaction dataframe.
+    """
+
+    df_filtered = df.copy()
+
+    # Initial sparsity
+    n_users = df_filtered[user_col].nunique()
+    n_items = df_filtered[item_col].nunique()
+    sparsity = 100 * df_filtered.shape[0] / (n_users * n_items)
+    if verbose:
+        print(f"Initial: users = {n_users}, items = {n_items}, sparsity = {sparsity:.4f}%")
+
+    # ---------- Step 1: Filter by items per user and users per item ----------
+    done = False
+    while not done:
+        starting_shape = df_filtered.shape[0]
+
+        user_counts = df_filtered.groupby(user_col)[item_col].count()
+        df_filtered = df_filtered[df_filtered[user_col].isin(user_counts[user_counts >= min_items_per_user].index)]
+
+        item_counts = df_filtered.groupby(item_col)[user_col].count()
+        df_filtered = df_filtered[df_filtered[item_col].isin(item_counts[item_counts >= min_users_per_item].index)]
+
+        if df_filtered.shape[0] == starting_shape:
+            done = True
+
+    n_users = df_filtered[user_col].nunique()
+    n_items = df_filtered[item_col].nunique()
+    sparsity = 100 * df_filtered.shape[0] / (n_users * n_items)
+    if verbose:
+        print(f"After item filtering: users = {n_users}, items = {n_items}, sparsity = {sparsity:.4f}%")
+
+    # ---------- Step 2: Filter by number of unique artists per user ----------
+    df_artist_valid = df_filtered[df_filtered[artist_col] != 0]
+    artist_per_user = df_artist_valid.groupby(user_col)[artist_col].nunique()
+
+    # ---------- Step 3: Filter by number of unique genres per user ----------
+    df_genre_exploded = df_filtered.explode(genre_col)
+    df_genre_exploded = df_genre_exploded[df_genre_exploded[genre_col] != 0]
+    genre_per_user = df_genre_exploded.groupby(user_col)[genre_col].nunique()
+
+    # ---------- Step 4: User intersection ----------
+    valid_users = set(artist_per_user[artist_per_user > min_artists_per_user].index) & \
+                  set(genre_per_user[genre_per_user > min_genres_per_user].index)
+
+    final_df = df_filtered[df_filtered[user_col].isin(valid_users)]
+
+    n_users = final_df[user_col].nunique()
+    n_items = final_df[item_col].nunique()
+    sparsity = 100 * final_df.shape[0] / (n_users * n_items)
+    if verbose:
+        print(f"Final: users = {n_users}, items = {n_items}, sparsity = {sparsity:.4f}%")
+
+    return final_df
+
 def train_test_split(interactions, split_count, fraction=None):
     """
     Desc:
@@ -63,20 +162,7 @@ def train_test_split(interactions, split_count, fraction=None):
         train_set (scipy.sparse matrix)
         test_set (scipy.sparse matrix)
         user_index
-    ------
-    💡 Summary of Data Flow
-        1. Start with full matrix
-        2. Choose subset of users (based on fraction and interaction count)
-        3. For each user:
-            - Select users who have at least 2 * split_count interactions, to avoid emptying their training data.
-            - Randomly pick split_count interactions to move to test set
-            - Zero out these entries in train and Copy the actual values into test
-        4. Output:
-            - train: with some ratings removed
-            - test: with those removed ratings
-            - user_index: which users were affected    
     """
-
     train = interactions.copy().tocoo()
     test = sp.lil_matrix(train.shape)
 
@@ -106,6 +192,57 @@ def train_test_split(interactions, split_count, fraction=None):
 
     assert(train.multiply(test).nnz == 0)
     return train.tocsr(), test.tocsr(), user_index
+
+
+def train_test_split_csr(interactions, split_count, fraction=None):
+    """
+    Desc:
+        Using this function, we split avaialble data to train and test set.
+    ------
+    Input:
+        interactions : interaction between users and streams (scipy.sparse matrix)
+        split_count : number of interactions per user to move from training to test set (int)
+        fraction : fraction of users to split their interactions train/test. If None, then all users (float)
+    ------
+    Output:
+        train_set (scipy.sparse matrix)
+        test_set (scipy.sparse matrix)
+        user_index
+    """
+    interactions = interactions.tocsr()
+    train = interactions.copy().tolil()
+    test = sp.lil_matrix(train.shape)
+
+
+    if fraction:
+        try:
+            user_index = np.random.choice(
+                np.where(np.bincount(train.row) >= split_count * 2)[0],
+                replace=False,
+                size=np.int64(np.floor(fraction * train.shape[0]))
+            ).tolist()
+        except:
+            print(('Not enough users with > {} '
+                  'interactions for fraction of {}')\
+                  .format(2*split_count, fraction))
+            raise
+    else:
+        user_index = range(train.shape[0])
+
+    train = train.tolil()
+
+    for user in user_index:
+        # Now interactions is CSR format which supports indexing
+        test_interactions = np.random.choice(interactions.getrow(user).indices,
+                                        size=split_count,
+                                        replace=False)
+        train[user, test_interactions] = 0.
+        test[user, test_interactions] = interactions[user, test_interactions]
+
+    assert(train.multiply(test).nnz == 0)
+    return train.tocsr(), test.tocsr(), user_index
+
+
 
 def get_df_matrix_mappings(df, row_name, col_name):
     """
@@ -178,18 +315,6 @@ def matrix_to_df(x,r,c):
         d.append({'user_id':r[i],'item_id':c[j],'rating':v})
     return pd.DataFrame.from_dict(d)
 
-"""
-Behavior: Only converts non-zero entries from the sparse matrix to DataFrame rows
-
-Output:
-
-Contains only actual ratings
-
-May miss items with zero interactions
-
-Example: If item_123 has no ratings, it won't appear in the DataFrame
-"""
-
 def matrix_to_df_2(x,r,c):
     d = []
     cx = x.tocoo()
@@ -201,15 +326,15 @@ def matrix_to_df_2(x,r,c):
             d.append({'user_id':r[0],'item_id':c[i],'rating':0})
     return pd.DataFrame.from_dict(d)
 
-"""
-Checks for items with zero total interactions (cx.sum(0) == 0)
+def matrix_to_full_df(sparse_matrix, idx_to_rid, idx_to_cid):
+    """
+    Convert sparse matrix to full DataFrame with original user_id / item_id
+    """
+    dense_array = sparse_matrix.toarray()
+    user_ids = [idx_to_rid[i] for i in range(dense_array.shape[0])]
+    item_ids = [idx_to_cid[i] for i in range(dense_array.shape[1])]
+    return pd.DataFrame(dense_array, index=user_ids, columns=item_ids)
 
-Adds artificial rows for these items:
-
-Uses first user's ID (r)
-
-Sets rating to 0 (even if zero wasn't in original data)
-"""
 
 def set_intersection(a,b):
     return list(set(a).intersection(set(b)))
@@ -257,13 +382,3 @@ def Grid_tune(X,Y,model,params,c_v=5,jobs=-1,score='neg_mean_squared_error'):
                     verbose=True)
     reg_bay.fit(X, Y)
     return reg_bay, reg_bay.best_params_
-
-
-def matrix_to_full_df(sparse_matrix, idx_to_rid, idx_to_cid):
-    """
-    Convert sparse matrix to full DataFrame with original user_id / item_id
-    """
-    dense_array = sparse_matrix.toarray()
-    user_ids = [idx_to_rid[i] for i in range(dense_array.shape[0])]
-    item_ids = [idx_to_cid[i] for i in range(dense_array.shape[1])]
-    return pd.DataFrame(dense_array, index=user_ids, columns=item_ids)

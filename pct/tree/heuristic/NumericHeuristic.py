@@ -14,8 +14,8 @@ class NumericHeuristic5(Heuristic5):
         """Determine which users belong to Lovers, Haters, and Unknowns based on the rating of the split item."""
         ratings = self.x[split_item].values  # Extract column values from DataFrame
 
-        indices_L = np.where(ratings >= 4)[0]  # Lovers: rating >= 4
-        indices_H = np.where((ratings <= 3) & (ratings > 0))[0]  # Haters: rating <= 3 and nonzero
+        indices_L = np.where(ratings > 50)[0]  # Lovers: rating >= 4
+        indices_H = np.where((ratings <= 50) & (ratings > 0))[0]  # Haters: rating <= 3 and nonzero
         return indices_L, indices_H
 
     def compute_statistics_for_groups(self, indices_L, indices_H):
