@@ -144,7 +144,11 @@ def threshold_interactions_df_plus(
     n_items = final_df[item_col].nunique()
     sparsity = 100 * final_df.shape[0] / (n_users * n_items)
     if verbose:
+        n_artists = final_df[artist_col].nunique()
+        n_genres = final_df.explode(genre_col)[genre_col].nunique()
         print(f"Final: users = {n_users}, items = {n_items}, sparsity = {sparsity:.4f}%")
+        print(f"unique artists = {n_artists}, unique genres = {n_genres}")
+       
 
     return final_df
 
