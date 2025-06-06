@@ -2,7 +2,7 @@ import numpy as np
 from sklearn.metrics.pairwise import cosine_similarity
 
 from pct.tree.heuristic.Heuristic import Heuristic5
-from pct.tree.heuristic.NumericHeuristic import NumericHeuristic5
+from pct.tree.heuristic.NumericHeuristicCopy2 import NumericHeuristic5
 
 # Global item_type_map is expected to be defined externally in the notebook
 item_type_map = {}
