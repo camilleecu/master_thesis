@@ -1,82 +1,117 @@
 import numpy as np
-# from splitterThread import parallelSplitter
-# from threading import Thread
-from pct.tree.ftest.ftest import FTest
-# from pct.tree.heuristic.NumericHeuristic import NumericHeuristic
-# from pct.tree.heuristic.CategoricalHeuristic import CategoricalHeuristic
+from sklearn.metrics.pairwise import cosine_similarity
+
 from pct.tree.heuristic.Heuristic import Heuristic5
-from pct.tree.heuristic.NumericHeuristicCopy2 import NumericHeuristic5
+from pct.tree.heuristic.NumericHeuristic import NumericHeuristic5
 
+# Global item_type_map is expected to be defined externally in the notebook
+item_type_map = {}
 
+def get_item_type(item_id):
+    return item_type_map.get(item_id, 'unknown')
+    
 class Splitter:
     def __init__(
         self,
         min_instances,
         numerical_attributes,
         categorical_attributes,
-        # ftest,
-        target_weights # Mostly used for HMC
+        target_weights  # Mostly used for HMC
     ):
-        """Constructs this splitter object with the given parameters.
-        
-        @param min_instances: The minimum number of (weighted) samples in a leaf node (stopping criterion).
-        @param numerical_attributes  : Iterable holding the names of the numerical   splitting attributes.
-        @param categorical_attributes: Iterable holding the nmaes of the categorical splitting attributes.
-        @param ftest: The p-value (in [0,1]) used in the F-test for the statistical significance of a split.
-        @param target_weights: The weights corresponding to the target variables.
-        """
+        """Constructs this splitter object with the given parameters."""
         self.criterion = "Squared Error"
         self.worst_performance = -1
         print("Initializing Splitter...")
-        # self.ftest = FTest(ftest)
 
         self.min_instances = min_instances
         self.numerical_attributes = numerical_attributes
         self.categorical_attributes = categorical_attributes
         self.target_weights = target_weights
 
-
-    
-
-    ## This function is implemented by Camille
-    def find_best_split_item(self, x, y, instance_weights):
-        """Finds the most informative item to split users based on squared error reduction.
-
-        @param x: User-item interaction matrix (rows = users, columns = items).
-        @param y: Target variable (ratings).
-        @param instance_weights: Weights assigned to each user.
-        @return: (best_item_id, criterion_value) - Item with highest variance in ratings.
-        """
-
+    def find_best_split_item(self, x, y, instance_weights, return_ranked=False):
+        """Finds the most informative item to split users based on squared error reduction."""
+        errors = {}
         best_item = None
         lowest_error = np.inf  # We want to minimize squared error
 
-        # Iterate over each item (column) in the user-item matrix
         for item_id in x.columns:
-            item_ratings = x[item_id].values.reshape(-1, 1)  # Convert column to 2D array
-           
-
-            # Skip items with too few ratings (ensure enough users per item)
+            item_ratings = x[item_id].values.reshape(-1, 1)
             if np.count_nonzero(~np.isnan(item_ratings)) < self.min_instances:
-                continue  
-            
-            # Compute squared error for this item using NumericHeuristic5
+                continue
+
             heuristic = NumericHeuristic5(
                 self.criterion, self.target_weights, self.min_instances,
                 instance_weights, x, y
             )
-            
-            total_error = heuristic.squared_error_total(item_id)  # Compute total squared error
-            
-            # Select the item with the lowest squared error
+            total_error = heuristic.squared_error_total(item_id)
+            errors[item_id] = total_error
+
             if total_error < lowest_error:
                 best_item = item_id
                 lowest_error = total_error
-            
-            
-        # If no valid item is found, return None (no split possible)
-        return best_item, lowest_error if best_item is not None else (-np.inf)
-       
 
+        if return_ranked:
+            ranked_items = sorted(errors.items(), key=lambda x: x[1])  # list of (item_id, error)
+            return best_item, lowest_error, ranked_items
+        else:
+            return best_item, lowest_error if best_item is not None else (-np.inf)
 
-    
+    def select_pair(self, items_ranked, x_df, strategy=1, top_k=20):
+        """
+        Selects a pair of items (itemA, itemB) from the ranked list for pairwise comparison.
+
+        Args:
+            items_ranked (list): List of item IDs ranked by heuristic score (best to worst).
+            x_df (DataFrame): User-item rating matrix, values from 0 to 100.
+            strategy (int): Selection strategy:
+                            1 - Top 2 items of the same type,
+                            2 - Most similar (cosine),
+                            3 - Least similar (cosine).
+            top_k (int): Only effective for strategy 2 and 3, limits number of candidate items.
+
+        Returns:
+            tuple: (itemA, itemB), both are item IDs.
+        """
+        itemA = items_ranked[0]
+        typeA = get_item_type(itemA)
+
+        # Build item vectors (binary: 1 if rated > 0, else 0)
+        item_vectors = {
+            item_id: (x_df[item_id] > 0).astype(int).values
+            for item_id in items_ranked[:top_k]
+            if get_item_type(item_id) == typeA
+        }
+
+        same_type_candidates = [i for i in item_vectors if i != itemA]
+
+        if strategy == 1:
+            if same_type_candidates:
+                itemB = same_type_candidates[0]
+            else:
+                raise ValueError("No same-type item found for strategy 1.")
+
+        elif strategy in (2, 3):
+            if itemA not in item_vectors:
+                raise ValueError(f"No vector found for item {itemA}")
+            vecA = item_vectors[itemA].reshape(1, -1)
+            print(f"\n[DEBUG] itemA = {itemA}, vecA = {vecA.flatten()}")
+
+            similarities = []
+            for item in same_type_candidates:
+                vecB = item_vectors[item].reshape(1, -1)
+                sim = cosine_similarity(vecA, vecB)[0, 0]
+                similarities.append((item, sim))
+                print(f"  Compared to itemB = {item}, vecB = {vecB.flatten()}, similarity = {sim:.3f}")
+
+            if not similarities:
+                raise ValueError("No valid similarity candidates found.")
+
+            itemB = (
+                max(similarities, key=lambda x: x[1])[0] if strategy == 2
+                else min(similarities, key=lambda x: x[1])[0]
+            )
+
+        else:
+            raise ValueError(f"Unsupported strategy: {strategy}")
+
+        return itemA, itemB
