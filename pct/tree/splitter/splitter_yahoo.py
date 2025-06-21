@@ -17,7 +17,8 @@ class Splitter:
         min_instances,
         numerical_attributes,
         categorical_attributes,
-        target_weights  # Mostly used for HMC
+        strategy,  # Strategy for selecting pairs
+        # target_weights  # Mostly used for HMC
     ):
         """Constructs this splitter object with the given parameters."""
         self.criterion = "Squared Error"
@@ -27,9 +28,10 @@ class Splitter:
         self.min_instances = min_instances
         self.numerical_attributes = numerical_attributes
         self.categorical_attributes = categorical_attributes
-        self.target_weights = target_weights
+        self.strategy = strategy  # Strategy for selecting pairs
+        # self.target_weights = target_weights
 
-    def find_split_items(self, x, y, instance_weights, return_ranked=False):
+    def find_split_items(self, x, y, return_ranked=True):
         """Finds the most informative item to split users based on squared error reduction."""
         errors = {}
         best_item = None
@@ -43,8 +45,8 @@ class Splitter:
                 continue
 
             heuristic = NumericHeuristic5(
-                self.criterion, self.target_weights, self.min_instances, #If it does not have enough ratings, it is skipped and not considered for splitting at this node.
-                instance_weights, x, y
+                self.criterion, self.min_instances, #If it does not have enough ratings, it is skipped and not considered for splitting at this node.
+                x, y
             )
             total_error = heuristic.squared_error_total(item_id)
             errors[item_id] = total_error
@@ -81,6 +83,7 @@ class Splitter:
         if not items_ranked:
             return None, None
 
+        print(f"[DEBUG] select_pair called with strategy={strategy}")
 
         itemA, errorA = items_ranked[0] # itemA = items_ranked[0]
         typeA = get_item_type(itemA)

@@ -72,6 +72,8 @@ class Tree:
         # self.rating_columns = x.select_dtypes(include=np.number).columns  # 🔥 Filter to numeric columns ONCE
         self.x = x 
         self.y = y
+        self.strategy = strategy
+
         #print("✅ Numerical attributes in fit function:", self.numerical_attributes)
         #print("✅Numerical attributes in fit function:", self.x[self.numerical_attributes].dtypes)
         #print("✅ Categorical attributes:", self.categorical_attributes)
@@ -82,15 +84,15 @@ class Tree:
         #    self.y = utils.create_prototypes(y)
 
         # print("✅ Creating target weights...")
-        self.target_weights = target_weights
-        if target_weights is None:
-            self.target_weights = utils.get_target_weights(self.y)
+        # self.target_weights = target_weights
+        # if target_weights is None:
+        #     self.target_weights = utils.get_target_weights(self.y)
 
         self.splitter = self.make_splitter()
 
         print("✅ Calling build()...")
-        instance_weights = pd.DataFrame(np.full(x.shape[0], Tree.INITIAL_WEIGHT), index=x.index)
-        self.root = self.build(self.x, self.y, instance_weights, None, strategy=strategy)
+        # instance_weights = pd.DataFrame(np.full(x.shape[0], Tree.INITIAL_WEIGHT), index=x.index)
+        self.root = self.build(self.x, self.y, None, strategy=strategy)
         print("✅ Tree built successfully!")
 
         return self
@@ -105,7 +107,7 @@ class Tree:
     """
 
 
-    def build(self, x, y, instance_weights, parent_node, depth=0, strategy=1):
+    def build(self, x, y, parent_node, depth=0, strategy=1):
         """Recursively build this predictive clustering tree with updated rI and rU per subset."""
         
         print(f"🔄 Building tree at depth {depth} with {len(x)} users and {len(y)} items.")
@@ -127,7 +129,7 @@ class Tree:
                 
        
         itemA, itemB = self.splitter.select_pair(
-            self.splitter.find_split_items(x, y, instance_weights, return_ranked=True), x, strategy=strategy, top_k=20)
+            self.splitter.find_split_items(x, y, return_ranked=True), x, strategy=strategy, top_k=20)
         print(f"🔍 Pair found: {itemA}, {itemB}")
     
 
@@ -191,9 +193,9 @@ class Tree:
         x_A, y_A = x.reindex(group_A).copy(), y.reindex(group_A).copy()
         x_B, y_B = x.reindex(group_B).copy(), y.reindex(group_B).copy()
         x_unknown, y_unknown = x.reindex(group_unknown).copy(), y.reindex(group_unknown).copy()
-        instance_weights_A = instance_weights.reindex(group_A).copy()
-        instance_weights_B = instance_weights.reindex(group_B).copy()
-        instance_weights_unknown = instance_weights.reindex(group_unknown).copy()
+        # instance_weights_A = instance_weights.reindex(group_A).copy()
+        # instance_weights_B = instance_weights.reindex(group_B).copy()
+        # instance_weights_unknown = instance_weights.reindex(group_unknown).copy()
 
         # print(f"🔍 Group A has {len(x_A)} users, Group B has {len(x_B)} users, Unknown group has {len(x_unknown)} users.")
     
@@ -202,9 +204,9 @@ class Tree:
 
         # Recursively build for each group
         node.children = [
-            self.build(x_A, y_A, instance_weights_A, node, depth + 1),
-            self.build(x_B, y_B, instance_weights_B, node, depth + 1),
-            self.build(x_unknown, y_unknown, instance_weights_unknown, node, depth + 1)
+            self.build(x_A, y_A, node, depth + 1),
+            self.build(x_B, y_B, node, depth + 1),
+            self.build(x_unknown, y_unknown, node, depth + 1)
         ]
 
 
@@ -219,8 +221,9 @@ class Tree:
             self.min_instances,
             self.numerical_attributes,
             self.categorical_attributes,
+            self.strategy,  # strategy for pair selection
             # self.ftest, 
-            self.target_weights
+            # self.target_weights
         )
 
     @staticmethod

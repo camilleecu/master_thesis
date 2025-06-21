@@ -3,8 +3,8 @@ import pandas as pd
 from pct.tree.heuristic.Heuristic import Heuristic5
 
 class NumericHeuristic5(Heuristic5):
-    def __init__(self, name, weights, min_instances, instance_weights, x, y): #, numerical_attributes
-        super().__init__(name, weights, min_instances, instance_weights, x, y)
+    def __init__(self, name, min_instances, x, y): #, numerical_attributes
+        super().__init__(name, min_instances, x, y)
         #self.numerical_attributes = numerical_attributes  # added to handle numerical attributes after item_type in yahoo data
         self.measure_heuristic = self.squared_error_total  # Use squared error for splitting
 

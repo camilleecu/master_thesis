@@ -19,15 +19,15 @@ import numpy as np
 
 
 class Heuristic5:
-    def __init__(self, name, weights, min_instances, instance_weights, x, y): # ftest,
+    def __init__(self, name, min_instances, x, y): # ftest,
         self.name = name
-        self.weights = weights
+        # self.weights = weights
         self.min_instances = min_instances
         # self.ftest = ftest
-        self.instance_weights = instance_weights
+        # self.instance_weights = instance_weights
         self.x = x  # User-item ratings matrix
         self.y = y  # Target variable (ratings or other)
-        self.n_tot = np.sum(self.instance_weights)  # Total weight
+        # self.n_tot = np.sum(self.instance_weights)  # Total weight
         self.current_criterion = None  # Placeholder for the splitting criterion
 
     def compute_statistics(self):
