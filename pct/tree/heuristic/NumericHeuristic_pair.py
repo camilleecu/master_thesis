@@ -3,9 +3,9 @@ import pandas as pd
 from pct.tree.heuristic.Heuristic import Heuristic5
 
 class NumericHeuristic5(Heuristic5):
-    def __init__(self, name, weights, min_instances, instance_weights, x, y, numerical_attributes):
+    def __init__(self, name, weights, min_instances, instance_weights, x, y): #, numerical_attributes
         super().__init__(name, weights, min_instances, instance_weights, x, y)
-        self.numerical_attributes = numerical_attributes  # added to handle numerical attributes after item_type in yahoo data
+        #self.numerical_attributes = numerical_attributes  # added to handle numerical attributes after item_type in yahoo data
         self.measure_heuristic = self.squared_error_total  # Use squared error for splitting
 
         # Compute statistics
@@ -21,9 +21,9 @@ class NumericHeuristic5(Heuristic5):
 
     def compute_statistics_for_groups(self, indices_L, indices_H):
         """Compute statistics (sum, squared sum, count) for each group based on user indices."""
-        print("✅ Numerical attributes in heuristics:", self.x[self.numerical_attributes].dtypes)
-        rating_cols = self.numerical_attributes # x.select_dtypes(include=np.number).columns # Filter numeric rating columns (exclude itemtype columns)
-        x_data = self.x[rating_cols] # Compute stats only for rating columns
+        #rating_cols = self.numerical_attributes #  # Filter numeric rating columns (exclude itemtype columns)
+        #x_data = self.x[rating_cols] # Compute stats only for rating columns
+        x_data = self.x
 
         # Compute for Lovers group
         sum_L = np.nansum(x_data.iloc[indices_L, :].values, axis=0)

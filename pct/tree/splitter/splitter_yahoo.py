@@ -4,6 +4,7 @@ from sklearn.metrics.pairwise import cosine_similarity
 from pct.tree.heuristic.Heuristic import Heuristic5
 from pct.tree.heuristic.NumericHeuristic_pair import NumericHeuristic5
 
+
 # Global item_type_map is expected to be defined externally in the notebook
 item_type_map = {}
 
@@ -21,7 +22,7 @@ class Splitter:
         """Constructs this splitter object with the given parameters."""
         self.criterion = "Squared Error"
         self.worst_performance = -1
-        print("Initializing Splitter...")
+        print("✅Initializing Splitter...")
 
         self.min_instances = min_instances
         self.numerical_attributes = numerical_attributes
@@ -33,31 +34,31 @@ class Splitter:
         errors = {}
         best_item = None
         lowest_error = np.inf  # We want to minimize squared error
-        
-        print("✅ Numerical attributes in find_split_items:", x[self.numerical_attributes].dtypes)
+
+        for item_id in x.columns:
 
 
-        for item_id in self.numerical_attributes: # previous with x without item_type, we use x.columns
-            item_ratings = x[item_id].values.reshape(-1, 1)
+            item_ratings = x[item_id].values.reshape(-1, 1) # This line extracts the ratings for a specific item from a DataFrame and reshapes them into a column vector.
             if np.count_nonzero(~np.isnan(item_ratings)) < self.min_instances:
                 continue
 
-        print(f"Evaluating item {item_id} for split...")    
+            heuristic = NumericHeuristic5(
+                self.criterion, self.target_weights, self.min_instances, #If it does not have enough ratings, it is skipped and not considered for splitting at this node.
+                instance_weights, x, y
+            )
+            total_error = heuristic.squared_error_total(item_id)
+            errors[item_id] = total_error
+            # print(f"🔍 Item {item_id} has total squared error: {total_error:.3f}")
+            
 
-        heuristic = NumericHeuristic5(
-            self.criterion, self.target_weights, self.min_instances,
-            instance_weights, x, y, self.numerical_attributes
-        )
-        total_error = heuristic.squared_error_total(item_id)
-        errors[item_id] = total_error
-
-        if total_error < lowest_error:
-            best_item = item_id
-            lowest_error = total_error
+            if total_error < lowest_error:
+                best_item = item_id
+                lowest_error = total_error
 
         if return_ranked:
-            ranked_items = sorted(errors.items(), key=lambda x: x[1])  #sorts these tuples by the error value (x[1]), in ascending order
-            return best_item, lowest_error, ranked_items
+            ranked_items = sorted(errors.items(), key=lambda x: x[1])  # list of (item_id, error)
+            # print(f"🔍 Ranked items by squared error: {ranked_items}")
+            return ranked_items # best_item, lowest_error,
         else:
             return best_item, lowest_error if best_item is not None else (-np.inf)
 
@@ -77,14 +78,18 @@ class Splitter:
         Returns:
             tuple: (itemA, itemB), both are item IDs.
         """
-        itemA = items_ranked[0]
-        typeA = get_item_type(itemA)
-        scoreA = x_df[itemA]  
+        if not items_ranked:
+            return None, None
 
+
+        itemA, errorA = items_ranked[0] # itemA = items_ranked[0]
+        typeA = get_item_type(itemA)
+        print(f"\n[DEBUG] Selected itemA = {itemA} with error = {errorA:.3f}, type = {typeA}")
+     
         # Build item vectors (binary: 1 if rated > 0, else 0)
         item_vectors = {
             item_id: (x_df[item_id] > 0).astype(int).values
-            for item_id in items_ranked[:top_k]
+            for item_id, _ in items_ranked[:top_k]
             if get_item_type(item_id) == typeA
         }
 
@@ -93,7 +98,6 @@ class Splitter:
         if strategy == 1:
             if same_type_candidates:
                 itemB = same_type_candidates[0]
-                scoreB = x_df[itemB]
             else:
                 raise ValueError("No same-type item found for strategy 1.")
 
@@ -117,9 +121,9 @@ class Splitter:
                 max(similarities, key=lambda x: x[1])[0] if strategy == 2
                 else min(similarities, key=lambda x: x[1])[0]
             )
-            scoreB = x_df[itemB]
+        
 
         else:
             raise ValueError(f"Unsupported strategy: {strategy}")
 
-        return itemA, scoreA, itemB, scoreB, strategy
+        return itemA, itemB

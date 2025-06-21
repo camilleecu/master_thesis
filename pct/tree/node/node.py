@@ -43,10 +43,10 @@ class Node:
             self.name = f"{attribute_name}_{Node.id}"
 
         
-    def set_prototype(self, y, weights):
-        """Sets the prototype for this node."""
-        self.y = y
-        self.prototype, _ = self.get_prototype(y, weights)
+    # def set_prototype(self, y, weights):
+    #     """Sets the prototype for this node."""
+    #     self.y = y
+    #     self.prototype, _ = self.get_prototype(y, weights)
 
 
     def set_num_users(self, lovers, haters, unknowns):
@@ -56,32 +56,36 @@ class Node:
         self.unknowns_count =  unknowns 
     
 
-    def make_leaf(self, y, weights):
+    def make_leaf(self, y, weights, depth=0):
         """Turn this node into a leaf node, setting a prototype for later classification."""
         self.y = y
-        # self.depth = depth
-        self.prototype, summed_weights = self.get_prototype(y, weights)
-        self.name = "leaf_" + str(self.id) + "=" + str(self.prototype) + " (" + str(summed_weights) + ")"
+        self.depth = depth
+        # self.prototype, summed_weights = self.get_prototype(y, np.ones_like(y))
+        Node.leaf_count += 1  # Increment the leaf count
+        # Set the children to None since this is a leaf node
+        self.children = [None, None, None]  # Ternary splits: [like, unknown, dislike]
+        # self.prototype, summed_weights = self.get_prototype(y, weights)
+        # self.name = "leaf_" + str(self.id) + "=" + str(self.prototype) + " (" + str(summed_weights) + ")"
         
     
-    def get_prototype(self, y, weights):
-        """Returns the prototype for this node, along with the sum of given weights."""
-        summed_weights = np.sum(weights.values)
+    # def get_prototype(self, y, weights):
+    #     """Returns the prototype for this node, along with the sum of given weights."""
+    #     summed_weights = np.sum(weights.values)
 
-        # Calculate the prototype
-        prototype = np.nansum(self.y.values * weights.values, axis=0)
-        prototype /= np.sum(
-            np.repeat(weights.values, repeats=self.y.shape[1], axis=1),
-            axis=0,
-            where=(~np.isnan(self.y.values))
-        )
-        prototype = np.round(prototype, 6)
+    #     # Calculate the prototype
+    #     prototype = np.nansum(self.y.values * weights.values, axis=0)
+    #     prototype /= np.sum(
+    #         np.repeat(weights.values, repeats=self.y.shape[1], axis=1),
+    #         axis=0,
+    #         where=(~np.isnan(self.y.values))
+    #     )
+    #     prototype = np.round(prototype, 6)
 
-        # Add the total error (criterion value) for reporting
-        total_error = self.criterion_value  # Assuming this stores the error
-        # print(f"Total Error (Criterion Value): {total_error}")
+    #     # Add the total error (criterion value) for reporting
+    #     total_error = self.criterion_value  # Assuming this stores the error
+    #     # print(f"Total Error (Criterion Value): {total_error}")
         
-        return prototype, summed_weights 
+    #     return prototype, summed_weights 
 
 
     # def make_leaf_prune(self, node1, node2):

@@ -38,7 +38,7 @@ class Tree:
         self.size = {"node_count": 0, "leaf_count": 0}
         self.categorical_attributes = None
         self.numerical_attributes = None
-        self.pruning_strat = None
+        # self.pruning_strat = None
 
     def create_rI_rU(self, x, y):
         """Dynamically generate rI and rU dictionaries based on current subset."""
@@ -62,18 +62,19 @@ class Tree:
         """
         Fit the predictive clustering tree on the given dataset and store rI and rU.
         """
-        x = pd.DataFrame(x)
-        y = pd.DataFrame(y) # print("✅ Converted x and y to DataFrame")
+        #x = pd.DataFrame(x)
+        #y = pd.DataFrame(y) # print("✅ Converted x and y to DataFrame")
+        
         
         # print("✅ Identifying numerical and categorical attributes...")
-        self.numerical_attributes = x.select_dtypes(include=np.number).columns
-        self.categorical_attributes = x.select_dtypes(exclude=np.number).columns
+        #self.numerical_attributes = x.select_dtypes(include=np.number).columns
+        #self.categorical_attributes = x.select_dtypes(exclude=np.number).columns
         # self.rating_columns = x.select_dtypes(include=np.number).columns  # 🔥 Filter to numeric columns ONCE
         self.x = x 
         self.y = y
-        print("✅ Numerical attributes in fit function:", self.numerical_attributes)
-        print("✅Numerical attributes in fit function:", self.x[self.numerical_attributes].dtypes)
-        print("✅ Categorical attributes:", self.categorical_attributes)
+        #print("✅ Numerical attributes in fit function:", self.numerical_attributes)
+        #print("✅Numerical attributes in fit function:", self.x[self.numerical_attributes].dtypes)
+        #print("✅ Categorical attributes:", self.categorical_attributes)
 
 
         #if utils.learning_task(y) == "classification":
@@ -106,73 +107,95 @@ class Tree:
 
     def build(self, x, y, instance_weights, parent_node, depth=0, strategy=1):
         """Recursively build this predictive clustering tree with updated rI and rU per subset."""
-        # print("🔄 Building tree at depth:", depth)
+        
+        print(f"🔄 Building tree at depth {depth} with {len(x)} users and {len(y)} items.")
 
         if depth == self.max_depth:
-            # print(f"🍃 Reached max depth at depth {depth}. Stopping recursion.")
-            self.size["leaf_count"] += 1
+            print(f"🍃 Reached max depth at depth {depth}. Stopping recursion.")
             node = Node(parent_node, depth=depth)
             node.user_ids = x.index.tolist() 
             # node.user_ids = x.index.values # for tree elicitation
-            node.make_leaf(y, instance_weights)
+            node.make_leaf(y, 1)
             return node
+        
+        if len(x) <= self.min_instances:
+            print(f"🍃 Not enough users ({len(x)}) to split (min_instances={self.min_instances}). Making leaf.")
+            node = Node(parent_node, depth=depth)
+            node.user_ids = x.index.tolist()
+            node.make_leaf(y, 1)
+            return node
+                
        
-        itemA, scoreA, itemB, scoreB, strategy = self.splitter.select_pair(
+        itemA, itemB = self.splitter.select_pair(
             self.splitter.find_split_items(x, y, instance_weights, return_ranked=True), x, strategy=strategy, top_k=20)
+        print(f"🔍 Pair found: {itemA}, {itemB}")
+    
 
-        print(f"🔍 Pair found: {itemA} (score: {scoreA}), {itemB} (score: {scoreB})")
 
         if itemA is None or itemB is None:
             # print("🍃 No valid items found for splitting. Stopping recursion.")
-            self.size["leaf_count"] += 1
             node = Node(parent_node, depth=depth)
             node.user_ids = x.index.tolist()
             # node.user_ids = x.index.values
-            node.make_leaf(y, instance_weights)
+            node.make_leaf(y, 1)
             return node
+        
+        # Create a node for this item split
+        self.size["node_count"] += 1
+        node = Node((itemA, itemB), parent_node, depth, item_id=(itemA, itemB))
+        node.user_ids = x.index.tolist()
 
          # Create rI and rU dynamically based on current subset
         rI_subset, rU_subset = self.create_rI_rU(x, y)
-        # all users in rI_subset
-        all_subset_users = set(rI_subset.keys())
+        # all users in rI_subset that have rated either itemA or itemB
+        all_subset_users = set(u for u, _ in rI_subset.get(itemA, [])) | set(u for u, _ in rI_subset.get(itemB, []))
+        users_no_rating = set(x.index) - all_subset_users
+        group_no_rating = list(users_no_rating)
+
+        print(f"🔍 Found {len(all_subset_users)} users who rated either {itemA} or {itemB}.")
+        print("User IDs in all_subset_users:", [u for u in all_subset_users])
+        print(f"🔍 Found {len(group_no_rating)} users with no ratings for both items.")
+
+    
 
         user_ratings_A = {user: rating for user, rating in rI_subset.get(itemA, [])}
         user_ratings_B = {user: rating for user, rating in rI_subset.get(itemB, [])}
 
-
+        print(f"🔍 User ratings for {itemA}: {user_ratings_A}"
+              f"\n🔍 User ratings for {itemB}: {user_ratings_B}")
 
        # Assign users to groups
         group_A = [
             u for u in all_subset_users
-            if (user_ratings_A[u] > 0 and user_ratings_B[u] == 0) or
-            (user_ratings_A[u] > 0 and user_ratings_B[u] > 0 and user_ratings_A[u] > user_ratings_B[u])
+            if (user_ratings_A.get(u, 0) > 0 and user_ratings_B.get(u, 0) == 0) or #.get(u, 0) will return the user's rating if it exists, or 0 if not.
+            (user_ratings_A.get(u, 0) > 0 and user_ratings_B.get(u, 0) > 0 and user_ratings_A.get(u, 0) > user_ratings_B.get(u, 0))
         ]
+
         group_B = [
             u for u in all_subset_users
-            if (user_ratings_B[u] > 0 and user_ratings_A[u] == 0) or
-            (user_ratings_A[u] > 0 and user_ratings_B[u] > 0 and user_ratings_B[u] > user_ratings_A[u])
+            if (user_ratings_B.get(u, 0) > 0 and user_ratings_A.get(u, 0) == 0) or
+            (user_ratings_A.get(u, 0) > 0 and user_ratings_B.get(u, 0) > 0 and user_ratings_B.get(u, 0) > user_ratings_A.get(u, 0))
         ]
+
         group_unknown = [
             u for u in all_subset_users
-            if (user_ratings_A[u] > 0 and user_ratings_B[u] > 0 and user_ratings_A[u] == user_ratings_B[u]) or
-            (user_ratings_A[u] == 0 and user_ratings_B[u] == 0)
+            if (user_ratings_A.get(u, 0) > 0 and user_ratings_B.get(u, 0) > 0 and user_ratings_A.get(u, 0) == user_ratings_B.get(u, 0)) or
+            (user_ratings_A.get(u, 0) == 0 and user_ratings_B.get(u, 0) == 0)
         ]
+        
+        group_unknown.extend(group_no_rating)
         print(f"Group A: {len(group_A)} users, Group B: {len(group_B)} users, Unknown: {len(group_unknown)} users")
+    
 
         # Create DataFrame subsets
-        x_A, y_A = x.loc[group_A], y.loc[group_A]
-        x_B, y_B = x.loc[group_B], y.loc[group_B]
-        x_unknown, y_unknown = x.loc[group_unknown], y.loc[group_unknown]
-        instance_weights_A = instance_weights.loc[group_A]
-        instance_weights_B = instance_weights.loc[group_B]
-        instance_weights_unknown = instance_weights.loc[group_unknown]
+        x_A, y_A = x.reindex(group_A).copy(), y.reindex(group_A).copy()
+        x_B, y_B = x.reindex(group_B).copy(), y.reindex(group_B).copy()
+        x_unknown, y_unknown = x.reindex(group_unknown).copy(), y.reindex(group_unknown).copy()
+        instance_weights_A = instance_weights.reindex(group_A).copy()
+        instance_weights_B = instance_weights.reindex(group_B).copy()
+        instance_weights_unknown = instance_weights.reindex(group_unknown).copy()
 
-
-
-        # Create a node for this item split
-        self.size["node_count"] += 1
-        node = Node((itemA, itemB), (scoreA, scoreB), parent_node, depth) # should we modify node.py according?
-        node.user_ids = x.index.tolist()
+        # print(f"🔍 Group A has {len(x_A)} users, Group B has {len(x_B)} users, Unknown group has {len(x_unknown)} users.")
     
         # Assign the number of users to the node
         node.set_num_users(len(x_A), len(x_B), len(x_unknown))
