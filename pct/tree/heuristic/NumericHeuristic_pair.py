@@ -26,7 +26,7 @@ class NumericHeuristic5(Heuristic5):
         x_data = self.x
 
         # Compute for Lovers group
-        sum_L = np.nansum(x_data.iloc[indices_L, :].values, axis=0)
+        sum_L = np.nansum(x_data.iloc[indices_L, :].values, axis=0) # sum of ratings for each item for Lovers group
         sum2_L = np.nansum(x_data.iloc[indices_L, :].values ** 2, axis=0)
         n_L = np.count_nonzero((x_data.iloc[indices_L, :].values != 0) & (~np.isnan(x_data.iloc[indices_L, :].values)), axis=0)
 

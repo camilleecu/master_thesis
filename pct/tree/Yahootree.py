@@ -67,16 +67,16 @@ class Tree:
         
         
         # print("✅ Identifying numerical and categorical attributes...")
-        #self.numerical_attributes = x.select_dtypes(include=np.number).columns
-        #self.categorical_attributes = x.select_dtypes(exclude=np.number).columns
+        # self.numerical_attributes = x.select_dtypes(include=np.number).columns
+        # self.categorical_attributes = x.select_dtypes(exclude=np.number).columns
         # self.rating_columns = x.select_dtypes(include=np.number).columns  # 🔥 Filter to numeric columns ONCE
         self.x = x 
         self.y = y
         self.strategy = strategy
 
-        #print("✅ Numerical attributes in fit function:", self.numerical_attributes)
-        #print("✅Numerical attributes in fit function:", self.x[self.numerical_attributes].dtypes)
-        #print("✅ Categorical attributes:", self.categorical_attributes)
+        # print("✅ Numerical attributes in fit function:", self.numerical_attributes)
+        # print("✅Numerical attributes in fit function:", self.x[self.numerical_attributes].dtypes)
+        # print("✅ Categorical attributes:", self.categorical_attributes)
 
 
         #if utils.learning_task(y) == "classification":

@@ -59,7 +59,8 @@ class Splitter:
 
         if return_ranked:
             ranked_items = sorted(errors.items(), key=lambda x: x[1])  # list of (item_id, error)
-            # print(f"🔍 Ranked items by squared error: {ranked_items}")
+            # print ranked_items and the corresponding error
+            print(f"\n[DEBUG] Ranked items by error: {[(item, f'{error:.3f}') for item, error in ranked_items]}")
             return ranked_items # best_item, lowest_error,
         else:
             return best_item, lowest_error if best_item is not None else (-np.inf)
@@ -89,7 +90,7 @@ class Splitter:
         typeA = get_item_type(itemA)
         print(f"\n[DEBUG] Selected itemA = {itemA} with error = {errorA:.3f}, type = {typeA}")
      
-        # Build item vectors (binary: 1 if rated > 0, else 0)
+        # Build item vectors; binary: 1; if rating > 0 type= typeA
         item_vectors = {
             item_id: (x_df[item_id] > 0).astype(int).values
             for item_id, _ in items_ranked[:top_k]
@@ -107,7 +108,7 @@ class Splitter:
         elif strategy in (2, 3):
             if itemA not in item_vectors:
                 raise ValueError(f"No vector found for item {itemA}")
-            vecA = item_vectors[itemA].reshape(1, -1)
+            vecA = item_vectors[itemA].reshape(1, -1) 
             print(f"\n[DEBUG] itemA = {itemA}, vecA = {vecA.flatten()}")
 
             similarities = []
