@@ -1,11 +1,11 @@
 import numpy as np
 # from splitterThread import parallelSplitter
 # from threading import Thread
-from pct.tree.ftest.ftest import FTest
+# from pct.tree.ftest.ftest import FTest
 # from pct.tree.heuristic.NumericHeuristic import NumericHeuristic
 # from pct.tree.heuristic.CategoricalHeuristic import CategoricalHeuristic
 from pct.tree.heuristic.Heuristic import Heuristic5
-from pct.tree.heuristic.NumericHeuristic import NumericHeuristic5
+from pct.tree.heuristic.NumericHeuristic_movie import NumericHeuristic5
 
 
 class Splitter:
@@ -15,7 +15,7 @@ class Splitter:
         numerical_attributes,
         categorical_attributes,
         # ftest,
-        target_weights # Mostly used for HMC
+        # target_weights # Mostly used for HMC
     ):
         """Constructs this splitter object with the given parameters.
         
@@ -33,13 +33,13 @@ class Splitter:
         self.min_instances = min_instances
         self.numerical_attributes = numerical_attributes
         self.categorical_attributes = categorical_attributes
-        self.target_weights = target_weights
+        # self.target_weights = target_weights
 
 
     
 
     ## This function is implemented by Camille
-    def find_best_split_item(self, x, y, instance_weights):
+    def find_best_split_item(self, x, y): #, instance_weights
         """Finds the most informative item to split users based on squared error reduction.
 
         @param x: User-item interaction matrix (rows = users, columns = items).
@@ -62,8 +62,7 @@ class Splitter:
             
             # Compute squared error for this item using NumericHeuristic5
             heuristic = NumericHeuristic5(
-                self.criterion, self.target_weights, self.min_instances,
-                instance_weights, x, y
+                self.criterion, self.min_instances, x, y
             )
             
             total_error = heuristic.squared_error_total(item_id)  # Compute total squared error

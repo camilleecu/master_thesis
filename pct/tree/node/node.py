@@ -56,7 +56,7 @@ class Node:
         self.unknowns_count =  unknowns 
     
 
-    def make_leaf(self, y, weights, depth=0):
+    def make_leaf(self, y, depth=0): # weights
         """Turn this node into a leaf node, setting a prototype for later classification."""
         self.y = y
         self.depth = depth

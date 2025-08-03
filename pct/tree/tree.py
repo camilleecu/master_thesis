@@ -33,7 +33,7 @@ class Tree:
         self.splitter = None
         self.x = None
         self.y = None
-        self.target_weights = None
+        # self.target_weights = None
         self.root = None
         self.size = {"node_count": 0, "leaf_count": 0}
         self.categorical_attributes = None
@@ -56,7 +56,7 @@ class Tree:
                     rU[user_id].append((item_id, rating))
         return rI, rU
 
-    def fit(self, x, y, target_weights=None): #target_weights=None
+    def fit(self, x, y): #target_weights=None 
         """
         Fit the predictive clustering tree on the given dataset and store rI and rU.
         """
@@ -76,9 +76,9 @@ class Tree:
             self.y = utils.create_prototypes(y)
 
         # print("✅ Creating target weights...")
-        self.target_weights = target_weights
-        if target_weights is None:
-            self.target_weights = utils.get_target_weights(self.y)
+        # self.target_weights = target_weights
+        # if target_weights is None:
+        #     self.target_weights = utils.get_target_weights(self.y)
 
         # print("✅ Identifying numerical and categorical attributes...")
         self.numerical_attributes = x.select_dtypes(include=np.number).columns
@@ -91,13 +91,13 @@ class Tree:
             raise ValueError("🚨 Splitter was not properly initialized!")
 
         print("✅ Calling build()...")
-        instance_weights = pd.DataFrame(np.full(x.shape[0], Tree.INITIAL_WEIGHT), index=x.index)
-        self.root = self.build(self.x, self.y, instance_weights, None)
+        # instance_weights = pd.DataFrame(np.full(x.shape[0], Tree.INITIAL_WEIGHT), index=x.index)
+        self.root = self.build(self.x, self.y, None) # instance_weights,
         print("✅ Tree built successfully!")
 
         return self
 
-    def build(self, x, y, instance_weights, parent_node, depth=0):
+    def build(self, x, y, parent_node, depth=0): # instance_weights,
         """Recursively build this predictive clustering tree with updated rI and rU per subset."""
         # print("🔄 Building tree at depth:", depth)
 
@@ -107,12 +107,12 @@ class Tree:
             node = Node(parent_node, depth=depth)
             node.user_ids = x.index.tolist() 
             # node.user_ids = x.index.values # for tree elicitation
-            node.make_leaf(y, instance_weights)
+            node.make_leaf(y) # , instance_weights
             return node
 
 
         # Select the best item (feature) for splitting
-        best_item, criterion_value = self.splitter.find_best_split_item(x, y, instance_weights)
+        best_item, criterion_value = self.splitter.find_best_split_item(x, y) #, instance_weights
         # print("🔍 Best item for splitting: ", best_item)
 
         if best_item is None:
@@ -121,7 +121,7 @@ class Tree:
             node = Node(parent_node, depth = depth)
             node.user_ids = x.index.tolist() 
             # node.user_ids = x.index.values # for tree elicitation
-            node.make_leaf(y, instance_weights)
+            node.make_leaf(y) # instance_weights
             return node
 
         # Create a node for this item split
@@ -142,8 +142,8 @@ class Tree:
        #  print("👥 Users who rated item {}: {}".format(best_item, len(users_rated_item)))
 
         # Classify users into three groups: Lovers, Haters, Unknowns
-        lovers = [u for u in users_rated_item if dict(rU_subset[u]).get(best_item, 0) > 50]
-        haters = [u for u in users_rated_item if dict(rU_subset[u]).get(best_item, 0) <= 50]
+        lovers = [u for u in users_rated_item if dict(rU_subset[u]).get(best_item, 0) >= 4] #> 50
+        haters = [u for u in users_rated_item if dict(rU_subset[u]).get(best_item, 0) <= 3] #<= 50
         unknowns = [u for u in x.index if u not in users_rated_item]
 
         # print("❤️ Lovers:", len(lovers))
@@ -160,16 +160,16 @@ class Tree:
 
 
 
-        instance_weights_lovers = instance_weights.loc[lovers].copy()
-        instance_weights_haters = instance_weights.loc[haters].copy()
-        instance_weights_unknowns = instance_weights.loc[unknowns].copy()
+        # instance_weights_lovers = instance_weights.loc[lovers].copy()
+        # instance_weights_haters = instance_weights.loc[haters].copy()
+        # instance_weights_unknowns = instance_weights.loc[unknowns].copy()
 
         # Recursively build the tree for each group with updated rI and rU
         # print("🔄 Recursively building tree for subsets...")
         node.children = [
-            self.build(x_lovers, y_lovers, instance_weights_lovers, node, depth + 1),
-            self.build(x_haters, y_haters, instance_weights_haters, node, depth + 1),
-            self.build(x_unknowns, y_unknowns, instance_weights_unknowns, node, depth + 1)
+            self.build(x_lovers, y_lovers, node, depth + 1), # instance_weights_lovers,
+            self.build(x_haters, y_haters, node, depth + 1), # instance_weights_haters,
+            self.build(x_unknowns, y_unknowns, node, depth + 1) # instance_weights_unknowns,
         ]
 
         return node
@@ -184,7 +184,7 @@ class Tree:
             self.numerical_attributes,
             self.categorical_attributes,
             # self.ftest, 
-            self.target_weights
+            # self.target_weights
         )
 
     @staticmethod
@@ -294,6 +294,18 @@ class Tree:
     #             decision_path[node.children[1]] = decision_path[node] if ~goLeft else 0
 
     #     return list(decision_path.values())
+
+    def predict(self, x: pd.DataFrame):
+        x = pd.DataFrame(x)
+        predictions = []
+
+        for _, instance in x.iterrows():
+            res = self.predict_instance(instance, self.root, {})
+            row_pred = [res.get(col, np.nan) for col in x.columns]
+            predictions.append(row_pred)
+
+        return pd.DataFrame(predictions, index=x.index, columns=x.columns)
+    
 
     def predict_instance(self, instance, node, res: dict):
         if node.is_leaf:
