@@ -6,6 +6,8 @@ from pct.tree.heuristic.semibi_NumericHeuristic import NumericHeuristic5
 
 # Global item_type_map is expected to be defined externally in the notebook
 item_type_map = {}
+def get_item_type(item_id):
+    return item_type_map.get(item_id, 'unknown')
     
 class Splitter:
     def __init__(
@@ -29,8 +31,7 @@ class Splitter:
         self.strategy = strategy
         self.item_type_map = item_type_map 
 
-    def get_item_type(item_id):
-        return item_type_map.get(item_id, 'unknown')
+
 
     def find_split_items(self, x, y, return_ranked=True):
         errors = {}
