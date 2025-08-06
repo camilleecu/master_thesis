@@ -321,7 +321,7 @@ class Tree:
         # Traverse to child nodes based on user's rating
         if pd.isna(rating) or rating == 0:
             return self.predict_instance(instance, node.children[2], res)  # Unknowns
-        elif rating >= 4:
+        elif rating >= 50:
             return self.predict_instance(instance, node.children[0], res)  # Lovers
         else:
             return self.predict_instance(instance, node.children[1], res)  # Haters
