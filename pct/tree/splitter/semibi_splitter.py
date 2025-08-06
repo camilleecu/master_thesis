@@ -6,9 +6,6 @@ from pct.tree.heuristic.semibi_NumericHeuristic import NumericHeuristic5
 
 # Global item_type_map is expected to be defined externally in the notebook
 item_type_map = {}
-
-def get_item_type(item_id):
-    return item_type_map.get(item_id, 'unknown')
     
 class Splitter:
     def __init__(
@@ -16,7 +13,9 @@ class Splitter:
         min_instances,
         numerical_attributes,
         categorical_attributes,
-        target_weights  # Mostly used for HMC
+        strategy,
+        item_type_map,  # Map of item IDs to their types
+        # target_weights  # Mostly used for HMC
     ):
         """Constructs this splitter object with the given parameters."""
         self.criterion = "Squared Error"
@@ -26,23 +25,24 @@ class Splitter:
         self.min_instances = min_instances
         self.numerical_attributes = numerical_attributes
         self.categorical_attributes = categorical_attributes
-        self.target_weights = target_weights
+        # self.target_weights = target_weights
+        self.strategy = strategy
+        self.item_type_map = item_type_map 
 
-    def find_best_split_item(self, x, y, instance_weights, return_ranked=False):
-        """Finds the most informative item to split users based on squared error reduction."""
+    def get_item_type(item_id):
+        return item_type_map.get(item_id, 'unknown')
+
+    def find_split_items(self, x, y, return_ranked=True):
         errors = {}
         best_item = None
-        lowest_error = np.inf  # We want to minimize squared error
+        lowest_error = np.inf
 
         for item_id in x.columns:
             item_ratings = x[item_id].values.reshape(-1, 1)
             if np.count_nonzero(~np.isnan(item_ratings)) < self.min_instances:
                 continue
 
-            heuristic = NumericHeuristic5(
-                self.criterion, self.target_weights, self.min_instances,
-                instance_weights, x, y
-            )
+            heuristic = NumericHeuristic5(self.criterion, self.min_instances, x, y)
             total_error = heuristic.squared_error_total(item_id)
             errors[item_id] = total_error
 
@@ -51,66 +51,54 @@ class Splitter:
                 lowest_error = total_error
 
         if return_ranked:
-            ranked_items = sorted(errors.items(), key=lambda x: x[1])  # list of (item_id, error)
-            return best_item, lowest_error, ranked_items
+            ranked_items = sorted(errors.items(), key=lambda x: x[1])
+            return ranked_items
         else:
             return best_item, lowest_error if best_item is not None else (-np.inf)
 
-    def select_pair(self, items_ranked, x_df, strategy=1, top_k=20):
-        """
-        Selects a pair of items (itemA, itemB) from the ranked list for pairwise comparison.
+    def select_pair(self, items_ranked, x_df, strategy=None, top_k=20):
+        if strategy is None:
+            strategy = self.strategy  # use splitter default
 
-        Args:
-            items_ranked (list): List of item IDs ranked by heuristic score (best to worst).
-            x_df (DataFrame): User-item rating matrix, values from 0 to 100.
-            strategy (int): Selection strategy:
-                            1 - Top 2 items of the same type,
-                            2 - Most similar (cosine),
-                            3 - Least similar (cosine).
-            top_k (int): Only effective for strategy 2 and 3, limits number of candidate items.
+        if not items_ranked:
+            return None, None
 
-        Returns:
-            tuple: (itemA, itemB), both are item IDs.
-        """
-        itemA = items_ranked[0]
-        typeA = get_item_type(itemA)
+        itemA, errorA = items_ranked[0]
+        typeA = self.get_item_type(itemA)
 
-        # Build item vectors (binary: 1 if rated > 0, else 0)
         item_vectors = {
             item_id: (x_df[item_id] > 0).astype(int).values
-            for item_id in items_ranked[:top_k]
-            if get_item_type(item_id) == typeA
+            for item_id, _ in items_ranked[:top_k]
+            if self.get_item_type(item_id) == typeA
         }
 
         same_type_candidates = [i for i in item_vectors if i != itemA]
 
-        if strategy == 1:
+        # Fallback to strategy 1 if candidates missing
+        if strategy == 1 or (strategy in (2, 3) and not same_type_candidates):
             if same_type_candidates:
                 itemB = same_type_candidates[0]
             else:
-                raise ValueError("No same-type item found for strategy 1.")
+                print(f"[⚠️] No same-type candidates for itemA={itemA}, returning None.")
+                return None, None
 
         elif strategy in (2, 3):
             if itemA not in item_vectors:
-                raise ValueError(f"No vector found for item {itemA}")
-            vecA = item_vectors[itemA].reshape(1, -1)
-            print(f"\n[DEBUG] itemA = {itemA}, vecA = {vecA.flatten()}")
+                print(f"[⚠️] No vector for itemA={itemA}, fallback to strategy 1.")
+                return self.select_pair(items_ranked, x_df, strategy=1, top_k=top_k)
 
+            vecA = item_vectors[itemA].reshape(1, -1)
             similarities = []
             for item in same_type_candidates:
                 vecB = item_vectors[item].reshape(1, -1)
                 sim = cosine_similarity(vecA, vecB)[0, 0]
                 similarities.append((item, sim))
-                print(f"  Compared to itemB = {item}, vecB = {vecB.flatten()}, similarity = {sim:.3f}")
 
             if not similarities:
-                raise ValueError("No valid similarity candidates found.")
+                print(f"[⚠️] No valid similarity candidates for itemA={itemA}, fallback to strategy 1.")
+                return self.select_pair(items_ranked, x_df, strategy=1, top_k=top_k)
 
-            itemB = (
-                max(similarities, key=lambda x: x[1])[0] if strategy == 2
-                else min(similarities, key=lambda x: x[1])[0]
-            )
-
+            itemB = max(similarities, key=lambda x: x[1])[0] if strategy == 2 else min(similarities, key=lambda x: x[1])[0]
         else:
             raise ValueError(f"Unsupported strategy: {strategy}")
 
