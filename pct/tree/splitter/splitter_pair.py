@@ -5,8 +5,6 @@ from pct.tree.heuristic.Heuristic import Heuristic5
 from pct.tree.heuristic.NumericHeuristic_pair import NumericHeuristic5
 
 
-def get_item_type(self, item_id):
-    return self.item_type_map.get(item_id, 'unknown') 
 
 class Splitter:
     def __init__(
@@ -26,6 +24,10 @@ class Splitter:
         self.categorical_attributes = categorical_attributes
         self.strategy = strategy
         self.item_type_map = item_type_map 
+
+
+    def get_item_type(self, item_id):
+        return self.item_type_map.get(item_id, 'unknown')     
 
 
     def find_split_items(self, x, y, return_ranked=True):

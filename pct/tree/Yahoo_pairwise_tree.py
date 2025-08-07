@@ -33,7 +33,7 @@ class Tree:
         self.splitter = None
         self.x = None
         self.y = None
-        self.target_weights = None
+        # self.target_weights = None
         self.root = None
         self.size = {"node_count": 0, "leaf_count": 0}
         self.categorical_attributes = None
@@ -59,7 +59,7 @@ class Tree:
     # rI (item-to-user) and rU (user-to-item) 
     # The rI dictionary is then used to identify which users have rated the splitting item(s)
 
-    def fit(self, x, y, target_weights=None, strategy=1): #target_weights=None
+    def fit(self, x, y, strategy=1): #target_weights=None
         """
         Fit the predictive clustering tree on the given dataset and store rI and rU.
         """
@@ -234,29 +234,29 @@ class Tree:
         """Returns true if and only if the given value is an acceptable splitting value."""
         return criterion_value != -np.inf
 
-    @staticmethod
-    def get_new_weights(instance_weights, missing_index, subset_index):
-        """Returns the weight multipliers to be used for an instance that wants to pass through
-        a node, in case that instance has a missing value for the splitting attribute.
+    # @staticmethod
+    # def get_new_weights(instance_weights, missing_index, subset_index):
+    #     """Returns the weight multipliers to be used for an instance that wants to pass through
+    #     a node, in case that instance has a missing value for the splitting attribute.
 
-        @param instance_weights: The weights of the instances for the current node.
-        @param missing_index: Indices of the missing values for the splitting variable.
-        @param subset_index: Indices of the values going to the left branch of the node.
-        @return: Tuple (weight for left child, weight for right child), summing to 1.
-        """
-        total_weight = np.sum(instance_weights)
-        missing_weight = np.sum(instance_weights.loc[missing_index])
-        subset_weight = np.sum(instance_weights.loc[subset_index])
-        weight1 = (subset_weight / (total_weight - missing_weight)).values[0]
-        weight2 = 1 - weight1
-        return (weight1, weight2)
+    #     @param instance_weights: The weights of the instances for the current node.
+    #     @param missing_index: Indices of the missing values for the splitting variable.
+    #     @param subset_index: Indices of the values going to the left branch of the node.
+    #     @return: Tuple (weight for left child, weight for right child), summing to 1.
+    #     """
+    #     total_weight = np.sum(instance_weights)
+    #     missing_weight = np.sum(instance_weights.loc[missing_index])
+    #     subset_weight = np.sum(instance_weights.loc[subset_index])
+    #     weight1 = (subset_weight / (total_weight - missing_weight)).values[0]
+    #     weight2 = 1 - weight1
+    #     return (weight1, weight2)
 
-    def update_instance_weights(self, node_instance_weights, missing_index, partition_size, total_size):
-        # TODO unused?
-        proportion = (partition_size - len(missing_index)) / (total_size - len(missing_index))
-        # subset (total - missing)
-        node_instance_weights.loc[missing_index] = node_instance_weights.loc[missing_index] * proportion
-        return node_instance_weights
+    # def update_instance_weights(self, node_instance_weights, missing_index, partition_size, total_size):
+    #     # TODO unused?
+    #     proportion = (partition_size - len(missing_index)) / (total_size - len(missing_index))
+    #     # subset (total - missing)
+    #     node_instance_weights.loc[missing_index] = node_instance_weights.loc[missing_index] * proportion
+    #     return node_instance_weights
 
     # def postProcess(self, node):
     #     """

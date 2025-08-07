@@ -5,7 +5,7 @@ import numpy as np
 # from pct.tree.heuristic.NumericHeuristic import NumericHeuristic
 # from pct.tree.heuristic.CategoricalHeuristic import CategoricalHeuristic
 from pct.tree.heuristic.Heuristic import Heuristic5
-from pct.tree.heuristic.NumericHeuristic_movie import NumericHeuristic5
+from pct.tree.heuristic.NumericHeuristic_yahoo import NumericHeuristic5
 
 
 class Splitter:

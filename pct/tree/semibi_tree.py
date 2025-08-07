@@ -22,7 +22,7 @@ class Tree:
     VERBOSE = False  # Verbosity level
     INITIAL_WEIGHT = 1.0  # The initial weight used for a sample.
 
-    def __init__(self, *, min_instances=7, max_depth=3):  # , ftest=0.01
+    def __init__(self, *, min_instances=7, max_depth=3):  # , ftest=0.01 # item_type_map=None
         """Constructs a new predictive clustering tree (PCT).
         @param min_instances: The minimum number of (weighted) samples in a leaf node (stopping criterion).
         @param ftest: The p-value (in [0,1]) used in the F-test for the statistical significance of a split.
@@ -39,6 +39,7 @@ class Tree:
         self.categorical_attributes = None
         self.numerical_attributes = None
         self.pruning_strat = None
+        # self.item_type_map = item_type_map
 
     def create_rI_rU(self, x, y):
         """Dynamically generate rI and rU dictionaries based on current subset."""
@@ -56,7 +57,7 @@ class Tree:
                     rU[user_id].append((item_id, rating))
         return rI, rU
 
-    def fit(self, x, y): #target_weights=None 
+    def fit(self, x, y, strategy=1): #target_weights=None 
         """
         Fit the predictive clustering tree on the given dataset and store rI and rU.
         """
@@ -68,6 +69,7 @@ class Tree:
 
         self.x = x
         self.y = y
+        self.strategy = strategy
         # print("✅ Assigned x and y")
     
 
@@ -92,12 +94,12 @@ class Tree:
 
         print("✅ Calling build()...")
         # instance_weights = pd.DataFrame(np.full(x.shape[0], Tree.INITIAL_WEIGHT), index=x.index)
-        self.root = self.build(self.x, self.y, None) # instance_weights,
+        self.root = self.build(self.x, self.y, None, strategy=strategy) # instance_weights,
         print("✅ Tree built successfully!")
 
         return self
 
-    def build(self, x, y, parent_node, depth=0): # instance_weights,
+    def build(self, x, y, parent_node, depth=0, strategy=1): # instance_weights,
         """Recursively build this predictive clustering tree with updated rI and rU per subset."""
         # print("🔄 Building tree at depth:", depth)
 
@@ -183,6 +185,7 @@ class Tree:
             self.min_instances,
             self.numerical_attributes,
             self.categorical_attributes,
+            self.strategy
             # self.ftest, 
             # self.target_weights
         )

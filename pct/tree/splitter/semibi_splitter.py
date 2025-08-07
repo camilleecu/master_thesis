@@ -16,7 +16,7 @@ class Splitter:
         numerical_attributes,
         categorical_attributes,
         strategy,
-        item_type_map,  # Map of item IDs to their types
+        # ,  # Map of item IDs to their types
         # target_weights  # Mostly used for HMC
     ):
         """Constructs this splitter object with the given parameters."""
@@ -29,7 +29,7 @@ class Splitter:
         self.categorical_attributes = categorical_attributes
         # self.target_weights = target_weights
         self.strategy = strategy
-        self.item_type_map = item_type_map 
+        # self.item_type_map = item_type_map 
 
 
 
