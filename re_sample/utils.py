@@ -22,11 +22,16 @@ def threshold_interactions_df(df, row_name, col_name, row_min, col_min):
     """
     n_rows = df[row_name].unique().shape[0]
     n_cols = df[col_name].unique().shape[0]
-    sparsity = float(df.shape[0]) / float(n_rows*n_cols) * 100
+    density = float(df.shape[0]) / float(n_rows*n_cols) * 100 #observed interactions / possible interactions
+    # sparsity = 1.0 - density / 100.0
+    sparsity = 1.0 - density / 100.0
+
+ 
     print('Starting interactions info')
     print('Number of rows: {}'.format(n_rows))
     print('Number of cols: {}'.format(n_cols))
-    print('Sparsity: {:4.3f}%'.format(sparsity))
+    print('Density: {:4.3f}%'.format(density))
+    print('Sparsity: {:4.3f}%'.format(sparsity * 100))
 
     done = False
     while not done:
@@ -41,11 +46,13 @@ def threshold_interactions_df(df, row_name, col_name, row_min, col_min):
 
     n_rows = df[row_name].unique().shape[0]
     n_cols = df[col_name].unique().shape[0]
-    sparsity = float(df.shape[0]) / float(n_rows*n_cols) * 100
+    density = float(df.shape[0]) / float(n_rows*n_cols) * 100
+    sparsity = 1.0 - density / 100.0
     print('Ending interactions info')
     print('Number of rows: {}'.format(n_rows))
     print('Number of columns: {}'.format(n_cols))
-    print('Sparsity: {:4.3f}%'.format(sparsity))
+    print('Density: {:4.3f}%'.format(density))
+    print('Sparsity: {:4.3f}%'.format(sparsity * 100))
     return df
 
 def threshold_interactions_df_plus(
