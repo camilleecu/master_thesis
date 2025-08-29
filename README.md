@@ -42,3 +42,15 @@ Details on how the Yahoo data is preprocessed and filtered can be found in the n
 **Yahoo_data_processor.ipynb**
 
 This notebook documents the steps for cleaning, filtering, and preparing the Yahoo dataset before it is used in experiments and model training.
+
+
+### Figure Reproducibility
+
+- Plots of **pairwise_tree_1** and **pairwise_tree_2** can be found in the notebook:  
+  `Yahoo_Pairwise_elicitation.ipynb`
+
+- Plots of **single_item_tree_hybrid** and **Max performance** are available in the notebook:  
+  `Yahoo_single_elicitation.ipynb`
+
+Each notebook contains code and instructions to reproduce the corresponding figures used in the paper.
+
